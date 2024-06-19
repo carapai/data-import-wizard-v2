@@ -18,7 +18,7 @@ export default function MultipleSelect({
 }) {
     const metadata = useStore($metadata);
     return (
-        <Stack alignItems="center" direction="row" spacing="20px">
+        <Stack alignItems="center" direction="row" spacing="20px" flex={1}>
             {title}
             <Box flex={1}>
                 <Select<Option, true, GroupBase<Option>>

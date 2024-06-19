@@ -3,8 +3,13 @@ import { useDataEngine } from "@dhis2/app-runtime";
 import Table, { ColumnsType } from "antd/es/table";
 import { IProgram } from "data-import-wizard-utils";
 import { useStore } from "effector-react";
+import {
+    attributeMappingApi,
+    dhis2ProgramApi,
+    enrollmentMappingApi,
+    mappingApi,
+} from "../Events";
 import { $mapping } from "../Store";
-import { dhis2ProgramApi, mappingApi } from "../Events";
 
 import { getDHIS2Resource, useDHIS2Resource } from "../Queries";
 import { stepper } from "../Store";
@@ -47,7 +52,25 @@ export default function RemoteProgramSelect() {
             resource: `programs/${id}`,
             auth: programMapping.authentication,
             params: {
-                fields: "id,name,trackedEntityType[id,featureType],programType,featureType,organisationUnits[id,code,name,parent[name,parent[name,parent[name,parent[name,parent[name]]]]]],programStages[id,repeatable,featureType,name,code,programStageDataElements[id,compulsory,name,dataElement[id,name,code,optionSetValue,optionSet[id,name,options[id,name,code]]]]],programTrackedEntityAttributes[id,mandatory,sortOrder,allowFutureDate,trackedEntityAttribute[id,name,code,unique,generated,pattern,confidential,valueType,optionSetValue,displayFormName,optionSet[id,name,options[id,name,code]]]]",
+                fields: "id,name,trackedEntityType[id,featureType,trackedEntityTypeAttributes[id,trackedEntityAttribute[id,name,code,unique,generated,pattern,confidential,valueType,optionSetValue,displayFormName,optionSet[id,name,options[id,name,code]]]]],programType,featureType,organisationUnits[id,code,name,parent[name,parent[name,parent[name,parent[name,parent[name]]]]]],programStages[id,repeatable,featureType,name,code,programStageDataElements[id,compulsory,name,dataElement[id,name,code,optionSetValue,optionSet[id,name,options[id,name,code]]]]],programTrackedEntityAttributes[id,mandatory,sortOrder,allowFutureDate,trackedEntityAttribute[id,name,code,unique,generated,pattern,confidential,valueType,optionSetValue,displayFormName,optionSet[id,name,options[id,name,code]]]]",
+            },
+        });
+        enrollmentMappingApi.updateMany({
+            attribute: "info",
+            update: {
+                createEnrollments: true,
+                updateEnrollments: true,
+                enrollmentDateColumn: "enrollment.enrollmentDate",
+                incidentDateColumn: "enrollment.incidentDate",
+                enrollmentIdColumn: "enrollment.enrollment",
+            },
+        });
+        attributeMappingApi.updateMany({
+            attribute: "info",
+            update: {
+                createEntities: true,
+                updateEntities: true,
+                trackedEntityInstanceColumn: "trackedEntityInstance",
             },
         });
         mappingApi.updateMany({
@@ -55,13 +78,7 @@ export default function RemoteProgramSelect() {
             customOrgUnitColumn: false,
             program: {
                 ...programMapping.program,
-                createEnrollments: true,
-                createEntities: true,
-                updateEntities: true,
-                incidentDateColumn: "enrollment.incidentDate",
-                enrollmentDateColumn: "enrollment.enrollmentDate",
                 remoteProgram: id,
-                trackedEntityInstanceColumn: "trackedEntityInstance",
             },
         });
         dhis2ProgramApi.set(program);

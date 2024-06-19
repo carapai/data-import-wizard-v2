@@ -153,6 +153,7 @@ export const $configList = $mapping.map((state) => {
 });
 
 export const $attributeMapping = domain.createStore<Mapping>({});
+export const $enrollmentMapping = domain.createStore<Mapping>({});
 export const $remoteMapping = domain.createStore<Mapping>({});
 export const $remoteOrganisations = domain.createStore<any[]>([]);
 export const $programStageMapping = domain.createStore<StageMapping>({});
@@ -239,6 +240,7 @@ export const $metadata = combine(
         dhis2DataSet: $dhis2DataSet,
         programIndicators: $programIndicators,
         indicators: $indicators,
+        enrollmentMapping: $enrollmentMapping,
     },
     ({
         mapping,
@@ -255,6 +257,7 @@ export const $metadata = combine(
         dhis2DataSet,
         programIndicators,
         indicators,
+        enrollmentMapping,
     }) => {
         return makeMetadata({
             program,
@@ -271,6 +274,7 @@ export const $metadata = combine(
             dataSet,
             indicators,
             programIndicators,
+            enrollmentMapping,
         });
     }
 );
@@ -289,6 +293,7 @@ export const $disabled = combine(
     $programStageMapping,
     $attributeMapping,
     $organisationUnitMapping,
+    $enrollmentMapping,
     $metadata,
     $data,
     $hasError,
@@ -299,6 +304,7 @@ export const $disabled = combine(
         step,
         programStageMapping,
         attributeMapping,
+        enrollmentMapping,
         organisationUnitMapping,
         metadata,
         data,
@@ -319,6 +325,7 @@ export const $disabled = combine(
             program,
             metadata,
             hasError,
+            enrollmentMapping,
         });
     }
 );
@@ -425,4 +432,33 @@ export const $allNames = $program.map((state) => {
         names[id] = name;
     });
     return names;
+});
+
+export const $additionalParams = $mapping.map((mapping) => {
+    let additionalParams = {};
+    if (mapping.dhis2SourceOptions?.ous) {
+        additionalParams = {
+            ...additionalParams,
+            ou: mapping.dhis2SourceOptions.ous,
+        };
+    }
+
+    if (
+        mapping.dhis2SourceOptions &&
+        mapping.dhis2SourceOptions.period &&
+        mapping.dhis2SourceOptions.period.length > 0 &&
+        mapping.dhis2SourceOptions.period[0].startDate &&
+        mapping.dhis2SourceOptions.period[0].endDate &&
+        mapping.dhis2SourceOptions.searchPeriod === "enrollmentDate"
+    ) {
+        const programStartDate = mapping.dhis2SourceOptions.period[0].startDate;
+        const programEndDate = mapping.dhis2SourceOptions.period[0].endDate;
+
+        additionalParams = {
+            ...additionalParams,
+            programEndDate,
+            programStartDate,
+        };
+    }
+    return additionalParams;
 });

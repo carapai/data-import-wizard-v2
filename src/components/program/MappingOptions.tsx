@@ -42,7 +42,6 @@ const CheckSelect2 = ({
 }) => {
     const programMapping = useStore($mapping);
     const metadata = useStore($metadata);
-
     const isManual =
         programMapping.dataSource !== "dhis2-program" &&
         programMapping.isSource;

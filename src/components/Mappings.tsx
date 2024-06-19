@@ -182,6 +182,10 @@ export default function Mappings() {
                     created: dayjs().format("YYYY-MM-DD HH:mm:ss"),
                     type: "individual",
                     id: generateUid(),
+                    headerRow: 1,
+                    dataStartRow: 2,
+                    chunkSize: 100,
+                    dhis2DestinationOptions: { async: true },
                 });
                 navigate({ to: "./individual" });
             },

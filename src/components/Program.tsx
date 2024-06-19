@@ -14,6 +14,7 @@ import {
     $data,
     $dhis2Program,
     $disabled,
+    $enrollmentMapping,
     $goData,
     $goDataOptions,
     $mapping,
@@ -39,7 +40,6 @@ import ImportExportOptions from "./ImportExportOptions";
 import MappingDetails from "./MappingDetails";
 import OrganisationUnitMapping from "./OrganisationUnitMapping";
 import AttributeMapping from "./program/AttributeMapping";
-import DHIS2ToDHIS2ProgramOptions from "./program/DHIS2ToDHIS2ProgramOptions";
 import EventMapping from "./program/EventMapping";
 import MappingOptions from "./program/MappingOptions";
 import { OtherSystemMapping } from "./program/OtherSystemMapping";
@@ -50,6 +50,7 @@ import RemoteOutbreaks from "./RemoteOutbreak";
 import RemoteProgramSelect from "./RemoteProgramSelect";
 import StepperButtons from "./StepperButtons";
 import StepsDisplay from "./StepsDisplay";
+import EnrollmentMapping from "./program/EnrollmentMapping";
 
 const importTypes: Option[] = [
     { value: "dhis2-program", label: "dhis2-program" },
@@ -69,6 +70,7 @@ const Program = () => {
     const attributeMapping = useStore($attributeMapping);
     const programStageMapping = useStore($programStageMapping);
     const optionMapping = useStore($optionMapping);
+    const enrollmentMapping = useStore($enrollmentMapping);
     const name = useStore($name);
     const otherName = useStore($otherName);
     const action = useStore($action);
@@ -83,9 +85,10 @@ const Program = () => {
             let data = await loadProgram<IProgram>({
                 engine,
                 id,
-                fields: "id,name,trackedEntityType[id,featureType],programType,featureType,organisationUnits[id,code,name,parent[name,parent[name,parent[name,parent[name,parent[name]]]]]],programStages[id,repeatable,featureType,name,code,programStageDataElements[id,compulsory,name,dataElement[id,name,code,optionSetValue,optionSet[id,name,options[id,name,code]]]]],programTrackedEntityAttributes[id,mandatory,sortOrder,allowFutureDate,trackedEntityAttribute[id,name,code,unique,generated,pattern,confidential,valueType,optionSetValue,displayFormName,optionSet[id,name,options[id,name,code]]]]",
+                fields: "id,name,trackedEntityType[id,featureType,trackedEntityTypeAttributes[id,trackedEntityAttribute[id,name,code,unique,generated,pattern,confidential,valueType,optionSetValue,displayFormName,optionSet[id,name,options[id,name,code]]]]],programType,featureType,organisationUnits[id,code,name,parent[name,parent[name,parent[name,parent[name,parent[name]]]]]],programStages[id,repeatable,featureType,name,code,programStageDataElements[id,compulsory,name,dataElement[id,name,code,optionSetValue,optionSet[id,name,options[id,name,code]]]]],programTrackedEntityAttributes[id,mandatory,sortOrder,allowFutureDate,trackedEntityAttribute[id,name,code,unique,generated,pattern,confidential,valueType,optionSetValue,displayFormName,optionSet[id,name,options[id,name,code]]]]",
                 resource: "programs",
             });
+
             const other = programMapping.isSource
                 ? { source: data.name }
                 : { destination: data.name };
@@ -150,13 +153,6 @@ const Program = () => {
             lastLabel: "Go to Mappings",
         },
         {
-            label: "DHIS2 Options",
-            content: <DHIS2ToDHIS2ProgramOptions />,
-            nextLabel: "Next Step",
-            id: 14,
-            lastLabel: "Go to Mappings",
-        },
-        {
             label: "Organisation Mapping",
             content: <OrganisationUnitMapping />,
             nextLabel: "Next Step",
@@ -175,6 +171,13 @@ const Program = () => {
             content: <AttributeMapping />,
             nextLabel: "Next Step",
             id: 9,
+            lastLabel: "Go to Mappings",
+        },
+        {
+            label: "Enrollment Mapping",
+            content: <EnrollmentMapping />,
+            nextLabel: "Next Step",
+            id: 15,
             lastLabel: "Go to Mappings",
         },
         {
@@ -208,6 +211,12 @@ const Program = () => {
     ];
 
     const activeSteps = () => {
+        const {
+            info: { createEntities, updateEntities } = {
+                createEntities: true,
+                updateEntities: true,
+            },
+        } = attributeMapping;
         const activeSteps = steps.filter(({ id }) => {
             if (
                 programMapping.dataSource !== "dhis2-program" &&
@@ -249,30 +258,19 @@ const Program = () => {
             }
 
             if (programMapping.dataSource === "dhis2-program") {
-                let removeAttributeMapping: number[] = [];
-                if (
-                    !programMapping.program?.createEntities &&
-                    !programMapping.program?.updateEntities
-                ) {
-                    removeAttributeMapping = [9];
-                }
                 if (programMapping.prefetch) {
-                    return (
-                        [5, 4, 8, ...removeAttributeMapping].indexOf(id) === -1
-                    );
+                    return [5, 4, 8].indexOf(id) === -1;
                 }
-                return (
-                    [5, 4, 8, 12, ...removeAttributeMapping].indexOf(id) === -1
-                );
+                return [5, 4, 8, 12].indexOf(id) === -1;
             }
             if (programMapping.dataSource === "go-data") {
                 if (
                     programMapping.program?.programType ===
                     "WITHOUT_REGISTRATION"
                 ) {
-                    return [4, 6, 8, 9, 11, 14].indexOf(id) === -1;
+                    return [4, 6, 8, 9, 11].indexOf(id) === -1;
                 }
-                return [4, 6, 8, 11, 14].indexOf(id) === -1;
+                return [4, 6, 8, 11].indexOf(id) === -1;
             }
 
             return [1, 2, 3, 4, 7, 9, 10, 12, 13].indexOf(id) !== -1;
@@ -291,7 +289,7 @@ const Program = () => {
     };
 
     const onSave = async () => {
-        const result = await saveProgramMapping({
+        await saveProgramMapping({
             engine,
             mapping: {
                 ...programMapping,
@@ -303,6 +301,7 @@ const Program = () => {
             programStageMapping,
             attributeMapping,
             optionMapping,
+            enrollmentMapping,
         });
 
         actionApi.edit();
@@ -355,7 +354,7 @@ const Program = () => {
                 disabled={disabled}
             />
             <StepperButtons
-                disabled={disabled}
+                disabled={false}
                 steps={activeSteps()}
                 onNext={onNext}
                 onSave={onSave}

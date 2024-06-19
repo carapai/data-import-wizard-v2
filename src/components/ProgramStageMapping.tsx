@@ -502,7 +502,7 @@ export default function ProgramStageMapping({
             </Stack>
             <Stack direction="row" spacing="20px" alignItems="center">
                 {mapping.dataSource === "dhis2-program" && (
-                    <Stack flex={1} direction="row" alignItems="center">
+                    <Stack flex={1}>
                         <Text>Specific Stage</Text>
                         <Box flex={1}>
                             <Select<Option, false, GroupBase<Option>>

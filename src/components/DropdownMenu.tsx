@@ -20,12 +20,6 @@ import {
 import { useDataEngine } from "@dhis2/app-runtime";
 import { useNavigate } from "@tanstack/react-location";
 import {
-    convertToDHIS2,
-    convertToGoData,
-    fetchGoDataData,
-    fetchRemote,
-    fetchTrackedEntityInstances,
-    flattenTrackedEntityInstances,
     generateUid,
     getGoDataToken,
     getPreviousAggregateMapping,
@@ -33,13 +27,9 @@ import {
     IMapping,
     loadPreviousGoData,
     loadPreviousMapping,
-    processPreviousInstances,
-    programStageUniqElements,
-    programUniqAttributes,
 } from "data-import-wizard-utils";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useStore } from "effector-react";
-import { chunk } from "lodash";
 import { ChangeEvent, useState } from "react";
 import { BiDotsVerticalRounded } from "react-icons/bi";
 import { db } from "../db";
@@ -50,6 +40,7 @@ import {
     dataSetApi,
     dhis2DataSetApi,
     dhis2ProgramApi,
+    enrollmentMappingApi,
     goDataApi,
     goDataOptionsApi,
     mappingApi,
@@ -64,6 +55,7 @@ import { LocationGenerics } from "../Interfaces";
 
 import {
     $attributeMapping,
+    $enrollmentMapping,
     $mapping,
     $metadata,
     $optionMapping,
@@ -118,6 +110,7 @@ export default function DropdownMenu({
     const attributeMapping = useStore($attributeMapping);
     const optionMapping = useStore($optionMapping);
     const programStageMapping = useStore($programStageMapping);
+    const enrollmentMapping = useStore($enrollmentMapping);
     const program = useStore($program);
     const [action, setAction] = useState<
         "configuring" | "previewing" | "uploading"
@@ -159,6 +152,7 @@ export default function DropdownMenu({
                 programStageMapping,
                 attributeMapping,
                 optionMapping,
+                enrollmentMapping,
             });
             setLoading(() => false);
             setOpen(() => false);
@@ -187,9 +181,9 @@ export default function DropdownMenu({
         setOpen(() => false);
     };
     const handleOptionsCancel = () => {
+        setAction(() => "configuring");
         setOptionsDialogOpen(() => false);
     };
-
     const runDataSet = async (mapping: Partial<IMapping>) => {
         if (
             mapping.dataSource &&
@@ -203,8 +197,6 @@ export default function DropdownMenu({
         ) {
             setAction(() => "previewing");
         } else {
-            setOptionsDialogOpen(() => false);
-            setOptionsDialogOpen(() => true);
             if (mapping.prefetch) {
                 setAction(() => "previewing");
             } else {
@@ -214,127 +206,11 @@ export default function DropdownMenu({
     };
 
     const runProgram = async (mapping: Partial<IMapping>) => {
-        const {
-            params,
-            basicAuth,
-            hasNextLink,
-            headers,
-            password,
-            username,
-            ...rest
-        } = mapping.authentication || {};
-        if (mapping.dataSource === "go-data") {
-            setMessage(() => "Fetching go data token");
-            const token = await getGoDataToken(mapping);
-            const { options, organisations, outbreak, tokens } =
-                await loadPreviousGoData(token, mapping);
-            if (mapping.isSource) {
-                setMessage(() => "Fetching go data cases");
-                const { metadata, prev } = await fetchGoDataData(
-                    outbreak,
-                    mapping.authentication || {}
-                );
-                setMessage(() => "Fetching tracked entity instances");
-                await fetchTrackedEntityInstances(
-                    {
-                        api: { engine },
-                        program: mapping.program?.program,
-                        additionalParams: {},
-                        uniqueAttributeValues: [],
-                        withAttributes: false,
-                        trackedEntityInstances: [],
-                    },
-                    async (trackedEntityInstances, page) => {
-                        setMessage(
-                            () => `Working on page ${page} for tracked entities`
-                        );
-                        const { conflicts, errors, processed } =
-                            convertToGoData(
-                                flattenTrackedEntityInstances(
-                                    {
-                                        trackedEntityInstances,
-                                    },
-                                    "ALL"
-                                ),
-                                organisationUnitMapping,
-                                attributeMapping,
-                                outbreak,
-                                optionMapping,
-                                tokens,
-                                metadata
-                            );
-
-                        const { updates, inserts } = processed;
-                        // await groupGoData4Insert(
-                        //     outbreak,
-                        //     inserts,
-                        //     updates,
-                        //     prev,
-                        //     mapping.authentication || {},
-                        //     setMessage,
-                        //     setInserted,
-                        //     setUpdated,
-                        //     setErrored
-                        // );
-                    }
-                );
-            } else {
-                const goDataData = await fetchRemote<any[]>(
-                    {
-                        ...rest,
-                        params: {
-                            auth: { param: "access_token", value: token },
-                        },
-                    },
-                    `api/outbreaks/${mapping.program?.remoteProgram}/cases`
-                );
-
-                for (const current of chunk(goDataData, 25)) {
-                    await fetchTrackedEntityInstances(
-                        {
-                            api: { engine },
-                            program: mapping.program?.program,
-                            additionalParams: {},
-                            uniqueAttributeValues:
-                                metadata.uniqueAttributeValues,
-                            withAttributes: true,
-                            trackedEntityInstances:
-                                metadata.trackedEntityInstanceIds,
-                        },
-                        async (trackedEntityInstances) => {
-                            const previous = processPreviousInstances({
-                                trackedEntityInstances,
-                                programUniqAttributes:
-                                    programUniqAttributes(attributeMapping),
-                                programStageUniqueElements:
-                                    programStageUniqElements(
-                                        programStageMapping
-                                    ),
-                                trackedEntityIdIdentifiesInstance: false,
-                                programStageMapping,
-                                currentProgram: mapping.program?.program,
-                            });
-                            const results = await convertToDHIS2({
-                                previousData: previous,
-                                data: current,
-                                mapping,
-                                organisationUnitMapping,
-                                attributeMapping,
-                                programStageMapping,
-                                optionMapping,
-                                version,
-                                program,
-                            });
-                        }
-                    );
-                }
-            }
+        if (mapping.prefetch) {
+            setAction(() => "previewing");
+        } else {
+            setAction(() => "uploading");
         }
-
-        if (["api", "go-data"].indexOf(mapping.dataSource || "") !== -1) {
-        }
-
-        setAction(() => "previewing");
     };
 
     const run = async (id: string) => {
@@ -355,6 +231,7 @@ export default function DropdownMenu({
                 optionMapping,
                 program,
                 remoteProgram,
+                enrollmentMapping,
             } = await getPreviousProgramMapping(
                 { engine },
                 mapping,
@@ -367,6 +244,7 @@ export default function DropdownMenu({
             mappingApi.set(mapping);
             optionMappingApi.set(optionMapping);
             dhis2ProgramApi.set(remoteProgram);
+            enrollmentMappingApi.set(enrollmentMapping);
         } else if (mapping.type === "aggregate") {
             const {
                 attributeMapping,
@@ -386,7 +264,6 @@ export default function DropdownMenu({
             dhis2DataSetApi.set(remoteDataSet);
             dataSetApi.set(dataSet);
         }
-
         onClose();
         setOptionsDialogOpen(() => true);
     };
@@ -424,6 +301,7 @@ export default function DropdownMenu({
                 optionMapping,
                 program,
                 remoteProgram,
+                enrollmentMapping,
             } = await getPreviousProgramMapping(
                 { engine },
                 mapping,
@@ -436,6 +314,7 @@ export default function DropdownMenu({
             mappingApi.set(mapping);
             optionMappingApi.set(optionMapping);
             dhis2ProgramApi.set(remoteProgram);
+            enrollmentMappingApi.set(enrollmentMapping);
 
             if (mapping.dataSource === "go-data") {
                 setMessage(() => "Getting Go.Data token");
@@ -476,13 +355,6 @@ export default function DropdownMenu({
                     onClose();
                 }
             } else if (mapping.dataSource === "dhis2-program") {
-                mappingApi.updateMany({
-                    program: {
-                        ...mapping.program,
-                        incidentDateColumn: "enrollment.incidentDate",
-                        enrollmentDateColumn: "enrollment.enrollmentDate",
-                    },
-                });
                 onClose();
                 navigate({ to: "./individual" });
             } else {

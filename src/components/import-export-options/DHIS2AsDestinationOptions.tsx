@@ -10,7 +10,7 @@ export default function DHIS2AsDestinationOptions() {
     const mapping = useStore($mapping);
     if (!mapping.isSource)
         return (
-            <Stack flex={1}>
+            <Stack flex={1} spacing="30px">
                 <Checkbox
                     isChecked={mapping.dhis2DestinationOptions?.async}
                     onChange={(e: ChangeEvent<HTMLInputElement>) =>

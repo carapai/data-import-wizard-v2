@@ -6,8 +6,8 @@ import {
     Tabs,
     Text,
 } from "@chakra-ui/react";
-import { Table } from "antd";
 import type { TableColumnsType } from "antd";
+import { Table } from "antd";
 
 import {
     Attribute,
@@ -21,13 +21,23 @@ import { useMemo } from "react";
 import Superscript from "../Superscript";
 
 import { ColumnsType } from "antd/es/table";
-import { $allNames, $processed } from "../../Store";
+import { useLiveQuery } from "dexie-react-hooks";
 import { isArray, isObject } from "lodash";
 import { getOr } from "lodash/fp";
+import { db } from "../../db";
+import { $allNames, $processed } from "../../Store";
 export default function TrackerDataPreview() {
     const processed = useStore($processed);
     const allNames = useStore($allNames);
+
+    const errors = useLiveQuery(() => db.dataValueErrors.toArray());
+    const conflicts = useLiveQuery(() => db.dataValueConflicts.toArray());
     const columns: TableColumnsType<Partial<Attribute>> = [
+        {
+            title: "Data Element ID",
+            dataIndex: "attribute",
+            key: "attribute",
+        },
         {
             title: "Attribute",
             render: (_, record) =>
@@ -47,6 +57,11 @@ export default function TrackerDataPreview() {
     ];
 
     const dataValueColumns: TableColumnsType<Partial<DataValue>> = [
+        {
+            title: "Data Element ID",
+            dataIndex: "dataElement",
+            key: "dataElement",
+        },
         {
             title: "Data Element",
             render: (_, record) =>
@@ -156,13 +171,11 @@ export default function TrackerDataPreview() {
 
     const conflictColumns = useMemo<ColumnsType<any>>(
         () =>
-            Object.keys(processed.conflicts?.[0] ?? {})
-                .filter((i) => i !== "id")
-                .map((a) => ({
-                    title: a,
-                    key: a,
-                    render: (_, record) => allNames[record[a]] || record[a],
-                })),
+            Object.keys(processed.conflicts?.[0] ?? {}).map((a) => ({
+                title: a,
+                key: a,
+                render: (_, record) => allNames[record[a]] || record[a],
+            })),
         [Object.keys(processed.conflicts?.[0] ?? {})]
     );
     const errorColumns = useMemo<ColumnsType<any>>(

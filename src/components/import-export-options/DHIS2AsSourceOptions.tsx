@@ -48,7 +48,7 @@ export default function DHIS2AsSourceOptions() {
     }, []);
 
     return (
-        <Stack flex={1}>
+        <Stack flex={1} spacing="30px">
             <Stack spacing="20px">
                 <Checkbox
                     isChecked={getOr(false, "prefetch", mapping)}
@@ -62,7 +62,7 @@ export default function DHIS2AsSourceOptions() {
                     Preview
                 </Checkbox>
             </Stack>
-            <SwitchComponent condition={mapping.dataSource}>
+            {/* <SwitchComponent condition={mapping.dataSource}>
                 <Case value="dhis2-program">
                     <Stack>
                         <Text>Specific program stage</Text>
@@ -91,7 +91,7 @@ export default function DHIS2AsSourceOptions() {
                     </Stack>
                 </Case>
                 <Case default>{null}</Case>
-            </SwitchComponent>
+            </SwitchComponent> */}
             <Stack>
                 <Text>Period</Text>
                 <PeriodPicker

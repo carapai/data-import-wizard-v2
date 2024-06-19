@@ -1,26 +1,18 @@
 import { ColumnsType } from "antd/es/table";
 import {
-    Authentication,
-    convertToDHIS2,
-    Extraction,
-    fetchTrackedEntityInstances,
-    findUniqAttributes,
-    flattenTrackedEntityInstances,
-    generateUid,
-    IMapping,
-    IProgram,
-    Mapping,
-    Processed,
-    processPreviousInstances,
-    StageMapping,
-    TrackedEntityInstance,
-    Option,
-    convertToAggregate,
     AggDataValue,
+    Authentication,
+    convertToAggregate,
+    Extraction,
+    generateUid,
     IDataSet,
+    IMapping,
+    Mapping,
+    Option,
+    StageMapping,
 } from "data-import-wizard-utils";
 import dayjs from "dayjs";
-import { chunk, Dictionary, fromPairs, groupBy, orderBy, uniq } from "lodash";
+import { chunk, fromPairs, groupBy, orderBy, uniq } from "lodash";
 import { uniqBy } from "lodash/fp";
 import { utils, WorkBook } from "xlsx";
 import { Column, Threshold } from "../Interfaces";
@@ -402,6 +394,7 @@ export const saveProgramMapping = async ({
     attributeMapping,
     optionMapping,
     programStageMapping,
+    enrollmentMapping,
     action,
 }: {
     engine: any;
@@ -411,6 +404,7 @@ export const saveProgramMapping = async ({
     programStageMapping: StageMapping;
     optionMapping: Record<string, string>;
     action: "creating" | "editing";
+    enrollmentMapping: Mapping;
 }) => {
     const type = action === "creating" ? "create" : "update";
     const mutation: any = {
@@ -441,6 +435,11 @@ export const saveProgramMapping = async ({
         resource: `dataStore/iw-option-mapping/${mapping.id}`,
         data: optionMapping,
     };
+    const mutation6: any = {
+        type,
+        resource: `dataStore/iw-enrollment-mapping/${mapping.id}`,
+        data: enrollmentMapping,
+    };
 
     return await Promise.all([
         engine.mutate(mutation),
@@ -448,116 +447,8 @@ export const saveProgramMapping = async ({
         engine.mutate(mutation3),
         engine.mutate(mutation4),
         engine.mutate(mutation5),
+        engine.mutate(mutation6),
     ]);
-};
-
-export const processInstances = async (
-    {
-        trackedEntityInstances,
-        mapping,
-        attributeMapping,
-        engine,
-        version,
-        program,
-        optionMapping,
-        organisationUnitMapping,
-        programStageMapping,
-        programStageUniqueElements,
-        programUniqAttributes,
-        setMessage,
-    }: {
-        attributeMapping: Mapping;
-        mapping: Partial<IMapping>;
-        trackedEntityInstances: Array<Partial<TrackedEntityInstance>>;
-        engine: any;
-        version: number;
-        program: Partial<IProgram>;
-        optionMapping: Record<string, string>;
-        organisationUnitMapping: Mapping;
-        programStageMapping: StageMapping;
-        programStageUniqueElements: Dictionary<string[]>;
-        programUniqAttributes: string[];
-        setMessage: React.Dispatch<React.SetStateAction<string>>;
-    },
-    callback: (processedData: Processed) => Promise<void>
-) => {
-    const currentData = flattenTrackedEntityInstances(
-        {
-            trackedEntityInstances,
-        },
-        "ALL"
-    );
-    let instances: Array<Partial<TrackedEntityInstance>> = [];
-
-    let uniqueAttributeValues: any[] = [];
-    let trackedInstanceIds: string[] = [];
-
-    if (
-        mapping.program?.program === mapping.program?.remoteProgram &&
-        mapping.dataSource === "dhis2-program" &&
-        mapping.isCurrentInstance
-    ) {
-        instances = trackedEntityInstances;
-        trackedInstanceIds = trackedEntityInstances.flatMap(
-            ({ trackedEntityInstance }) => {
-                if (trackedEntityInstance) return trackedEntityInstance;
-                return [];
-            }
-        );
-    } else {
-        if (mapping.program?.trackedEntityInstanceColumn) {
-            trackedInstanceIds = trackedEntityInstances.flatMap(
-                ({ trackedEntityInstance }) => {
-                    if (trackedEntityInstance) return trackedEntityInstance;
-                    return [];
-                }
-            );
-        } else {
-            uniqueAttributeValues = findUniqAttributes(
-                currentData,
-                attributeMapping
-            );
-        }
-        if (currentData.length > 0) {
-            const { trackedEntityInstances } =
-                await fetchTrackedEntityInstances({
-                    api: { engine },
-                    program: mapping.program?.program,
-                    additionalParams: {},
-                    uniqueAttributeValues,
-                    withAttributes: true,
-                    trackedEntityInstances: trackedInstanceIds,
-                    fields: "*",
-                    pageSize: "50",
-                });
-            instances = trackedEntityInstances;
-        }
-    }
-
-    const {} = programStageMapping;
-
-    const previous = processPreviousInstances({
-        trackedEntityInstances: instances,
-        programUniqAttributes,
-        programStageUniqueElements,
-        currentProgram: mapping.program?.program,
-        programStageMapping,
-        trackedEntityIdIdentifiesInstance: trackedInstanceIds.length > 0,
-    });
-
-    setMessage(() => `Converting data to destination DHIS2`);
-    const convertedData = await convertToDHIS2({
-        previousData: previous,
-        data: currentData,
-        mapping: mapping,
-        organisationUnitMapping,
-        attributeMapping,
-        programStageMapping,
-        optionMapping,
-        version,
-        program,
-    });
-    await callback(convertedData);
 };
 
 export const authentication: Partial<Authentication> =

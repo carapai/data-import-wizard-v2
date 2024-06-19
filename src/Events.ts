@@ -34,6 +34,7 @@ import {
     $dataSet,
     $dhis2DataSet,
     $dhis2Program,
+    $enrollmentMapping,
     $errors,
     $goData,
     $goDataOptions,
@@ -191,7 +192,7 @@ export const processor = createApi($processed, {
         return { ...state, eventUpdates };
     },
     addErrors: (state, errors: Array<any>) => {
-        if (state.errors) {
+        if (state.errors && state.errors.length > 0) {
             return {
                 ...state,
                 errors: [...state.errors, ...errors],
@@ -200,7 +201,7 @@ export const processor = createApi($processed, {
         return { ...state, errors };
     },
     addConflicts: (state, conflicts: Array<any>) => {
-        if (state.conflicts) {
+        if (state.conflicts && state.conflicts.length > 0) {
             return {
                 ...state,
                 conflicts: [...state.conflicts, ...conflicts],
@@ -268,6 +269,25 @@ export const remoteMappingApi = createApi($remoteMapping, {
 });
 
 export const attributeMappingApi = createApi($attributeMapping, {
+    update: (state, payload: Update) => {
+        return updateObject(state, payload);
+    },
+    set: (_, value: Mapping) => value,
+    updateMany: (
+        state,
+        {
+            attribute,
+            update,
+        }: { attribute: string; update: Partial<RealMapping> }
+    ) => {
+        return {
+            ...state,
+            ...{ [attribute]: { ...state[attribute], ...update } },
+        };
+    },
+    reset: () => ({}),
+});
+export const enrollmentMappingApi = createApi($enrollmentMapping, {
     update: (state, payload: Update) => {
         return updateObject(state, payload);
     },

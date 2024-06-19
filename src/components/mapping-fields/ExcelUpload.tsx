@@ -18,6 +18,7 @@ export default function ExcelUpload({
     const sheets = useStore($sheets);
     const workbook = useStore($workbook);
     const mapping = useStore($mapping);
+
     const changeSheet = (e: SingleValue<Option>) => {
         mappingApi.update({
             attribute: "sheet",
@@ -26,11 +27,10 @@ export default function ExcelUpload({
 
         if (workbook && e && e.value) {
             const actual = generateData(mapping, workbook, e.value, extraction);
+            console.log(actual);
             dataApi.changeData(actual);
         }
     };
-
-    const callback = () => {};
 
     return (
         <Stack spacing="30px">

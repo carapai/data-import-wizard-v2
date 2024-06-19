@@ -22,6 +22,7 @@ export class CQIDexie extends Dexie {
         completed: string;
     }>;
     dataValueConflicts!: Table<AggConflict>;
+    dataValueErrors!: Table<AggConflict>;
     trackerResponses!: Table<{
         id: string;
         created: number;
@@ -42,7 +43,7 @@ export class CQIDexie extends Dexie {
     }>;
     constructor() {
         super("diw");
-        this.version(7).stores({
+        this.version(8).stores({
             organisations: "++id,value,pId,title",
             expandedKeys: "++id,name",
             levels: "++value,label",
@@ -50,6 +51,7 @@ export class CQIDexie extends Dexie {
             dataValueResponses: "id,completed",
             trackerResponses: "id,completed",
             dataValueConflicts: "object",
+            dataValueErrors: "uid,object",
         });
     }
 }

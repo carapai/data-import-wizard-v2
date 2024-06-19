@@ -2,7 +2,6 @@ import { Stack, useDisclosure } from "@chakra-ui/react";
 import { useDataEngine } from "@dhis2/app-runtime";
 import { AxiosInstance } from "axios";
 import {
-    convertFromDHIS2,
     convertToDHIS2,
     convertToGoData,
     fetchEvents,
@@ -15,9 +14,10 @@ import {
     postRemote,
     processPreviousInstances,
     TrackedEntityInstance,
+    processInstances,
 } from "data-import-wizard-utils";
 import { useStore } from "effector-react";
-import { chunk, maxBy } from "lodash";
+import { chunk, maxBy, uniqBy } from "lodash";
 import { useEffect, useState } from "react";
 import {
     $attributeMapping,
@@ -33,6 +33,7 @@ import {
     $programUniqAttributes,
     $remoteAPI,
     $tokens,
+    $enrollmentMapping,
 } from "../../Store";
 
 import {
@@ -42,11 +43,11 @@ import {
     processor,
 } from "../../Events";
 import { $version } from "../../Store";
-import { processInstances } from "../../utils/utils";
 import GoDataPreview from "../GoDataPreview";
 import Progress from "../Progress";
 import OtherSystemPreview from "./OtherSystemPreview";
 import DHIS2Preview from "./TrackerDataPreview";
+import { db } from "../../db";
 
 export default function Preview() {
     const version = useStore($version);
@@ -57,6 +58,7 @@ export default function Preview() {
     const { isOpen, onOpen, onClose } = useDisclosure();
     const mapping = useStore($mapping);
     const programStageMapping = useStore($programStageMapping);
+    const enrollmentMapping = useStore($enrollmentMapping);
     const organisationUnitMapping = useStore($organisationUnitMapping);
     const attributeMapping = useStore($attributeMapping);
     const programUniqAttributes = useStore($programUniqAttributes);
@@ -65,7 +67,6 @@ export default function Preview() {
     const goData = useStore($goData);
     const data = useStore($data);
     const [message, setMessage] = useState<string>("");
-
     const remoteAPI = useStore($remoteAPI);
 
     const process = async () => {
@@ -106,7 +107,11 @@ export default function Preview() {
                 });
             }
 
-            const flattened = flattenTrackedEntityInstances(instances, "ALL");
+            const flattened = flattenTrackedEntityInstances(
+                instances,
+                "ALL",
+                Object.keys(programStageMapping)
+            );
 
             if (mapping.dataSource === "go-data") {
                 const { metadata, prev } = await fetchGoDataData(
@@ -125,26 +130,29 @@ export default function Preview() {
                 processedGoDataDataApi.set(responseData);
                 prevGoDataApi.set(prev);
             } else {
-                const data = await convertFromDHIS2(
-                    flattenTrackedEntityInstances(instances, "ALL"),
-                    mapping,
-                    organisationUnitMapping,
-                    attributeMapping,
-                    false,
-                    optionMapping
-                );
-                otherProcessedApi.addNewInserts(data);
+                // const data = await convertFromDHIS2(
+                //     flattenTrackedEntityInstances(instances, "ALL"),
+                //     mapping,
+                //     organisationUnitMapping,
+                //     attributeMapping,
+                //     false,
+                //     optionMapping
+                // );
+                // otherProcessedApi.addNewInserts(data);
             }
         } else {
             if (
                 mapping.dataSource === "dhis2-program" &&
                 mapping.program?.remoteProgram
             ) {
-                let api: Partial<{ engine: any; axios: AxiosInstance }> = {};
-                if (mapping.isCurrentInstance) {
-                    api = { engine };
+                let queryApi: Partial<{ engine: any; axios: AxiosInstance }> =
+                    {};
+                if (mapping.isSource) {
+                    queryApi = { engine };
+                } else if (mapping.isCurrentInstance) {
+                    queryApi = { engine };
                 } else if (remoteAPI) {
-                    api = { axios: remoteAPI };
+                    queryApi = { axios: remoteAPI };
                 }
                 setMessage(() => "Fetching program data");
 
@@ -160,7 +168,7 @@ export default function Preview() {
                     mapping.dhis2SourceOptions.programStage.length > 0
                 ) {
                     await fetchEvents({
-                        api,
+                        api: queryApi,
                         programStages: mapping.dhis2SourceOptions.programStage,
                         pageSize: 50,
                         afterFetch: (data) => {
@@ -177,6 +185,7 @@ export default function Preview() {
                                     organisationUnitMapping,
                                     programStageUniqueElements,
                                     programUniqAttributes,
+                                    enrollmentMapping,
                                     setMessage,
                                 },
                                 async (data) => {
@@ -228,7 +237,7 @@ export default function Preview() {
                     }
                     await fetchTrackedEntityInstances(
                         {
-                            api,
+                            api: queryApi,
                             program: mapping.program?.remoteProgram,
                             additionalParams,
                             uniqueAttributeValues: [],
@@ -250,6 +259,7 @@ export default function Preview() {
                                     programStageUniqueElements,
                                     programUniqAttributes,
                                     setMessage,
+                                    enrollmentMapping,
                                 },
                                 async (data) => {
                                     setMessage(() => "Adding data to preview");
@@ -264,8 +274,12 @@ export default function Preview() {
                                     processor.addEventUpdates(
                                         data.eventUpdates
                                     );
-                                    processor.addErrors(data.errors);
-                                    processor.addConflicts(data.conflicts);
+                                    processor.addErrors(
+                                        uniqBy(data.errors, "id")
+                                    );
+                                    processor.addConflicts(
+                                        uniqBy(data.conflicts, "id")
+                                    );
                                 }
                             );
                         }
@@ -397,6 +411,7 @@ export default function Preview() {
                                     optionMapping,
                                     version,
                                     program,
+                                    enrollmentMapping,
                                 });
                                 processor.addInstances(processedInstances);
                                 processor.addEnrollments(enrollments);
@@ -450,6 +465,7 @@ export default function Preview() {
                             optionMapping,
                             version,
                             program,
+                            enrollmentMapping,
                         });
                         processor.addInstances(processedInstances);
                         processor.addEnrollments(enrollments);
@@ -458,8 +474,8 @@ export default function Preview() {
                             trackedEntityInstanceUpdates
                         );
                         processor.addEventUpdates(eventUpdates);
-                        processor.addErrors(errors);
-                        processor.addConflicts(conflicts);
+                        processor.addErrors(uniqBy(errors, "id"));
+                        processor.addConflicts(uniqBy(conflicts, "id"));
                     }
                 );
             }

@@ -12,7 +12,7 @@ export default function ImportExportOptions({
 }) {
     const mapping = useStore($mapping);
     return (
-        <Stack>
+        <Stack spacing="30px">
             {[
                 "json",
                 "go-data",

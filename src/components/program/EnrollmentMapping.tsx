@@ -15,8 +15,8 @@ import { useStore } from "effector-react";
 import { FiCheck } from "react-icons/fi";
 
 import { ChangeEvent, useEffect, useState } from "react";
-import { attributeMappingApi } from "../../Events";
-import { $attributeMapping, $mapping, $metadata, $names } from "../../Store";
+import { enrollmentMappingApi } from "../../Events";
+import { $enrollmentMapping, $mapping, $metadata, $names } from "../../Store";
 import { findMapped, isMapped } from "../../utils/utils";
 import CustomColumn from "../CustomColumn";
 import DestinationIcon from "../DestinationIcon";
@@ -24,33 +24,38 @@ import MultipleSelect from "../MultipleSelect";
 import OptionSetMapping from "../OptionSetMapping";
 import Search from "../Search";
 import SourceIcon from "../SourceIcon";
+import InfoMapping from "../InfoMapping";
 
-export default function AttributeMapping() {
+export default function EnrollmentMapping() {
     const {
         info: {
-            customTrackedEntityInstanceColumn,
-            trackedEntityInstanceColumn,
-            createEntities,
-            updateEntities,
+            customEnrollmentDateColumn,
+            enrollmentDateColumn,
+            createEnrollments,
+            updateEnrollments,
+            enrollmentIdColumn,
+            customEnrollmentIdColumn,
         } = {
-            customTrackedEntityInstanceColumn: false,
-            trackedEntityInstanceColumn: "",
-            createEntities: false,
-            updateEntities: false,
+            customEnrollmentDateColumn: false,
+            enrollmentDateColumn: "",
+            createEnrollments: false,
+            updateEnrollments: false,
+            enrollmentIdColumn: "",
+            customEnrollmentIdColumn: false,
         },
-        ...attributeMapping
-    } = useStore($attributeMapping);
+        ...enrollmentMapping
+    } = useStore($enrollmentMapping);
     const programMapping = useStore($mapping);
     const toast = useToast();
     const metadata = useStore($metadata);
     const { source, destination } = useStore($names);
     const [attributes, setCurrentAttributes] = useState(
-        metadata.destinationAttributes
+        metadata.destinationEnrollmentAttributes
     );
 
     const [searchString, setSearchString] = useState<string>("");
 
-    const currentMappingValues = Object.values(attributeMapping).map(
+    const currentMappingValues = Object.values(enrollmentMapping).map(
         ({ value }) => value
     );
 
@@ -74,11 +79,11 @@ export default function AttributeMapping() {
             render: (text, { value, mandatory }) => (
                 <Checkbox
                     isChecked={
-                        attributeMapping[value ?? ""]?.mandatory || mandatory
+                        enrollmentMapping[value ?? ""]?.mandatory || mandatory
                     }
                     isReadOnly={mandatory}
                     onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                        attributeMappingApi.update({
+                        enrollmentMappingApi.update({
                             attribute: value ?? "",
                             key: "mandatory",
                             value: e.target.checked,
@@ -94,10 +99,10 @@ export default function AttributeMapping() {
             align: "center",
             render: (text, { value, unique }) => (
                 <Checkbox
-                    isChecked={attributeMapping[value ?? ""]?.unique || unique}
+                    isChecked={enrollmentMapping[value ?? ""]?.unique || unique}
                     isReadOnly={unique}
                     onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                        attributeMappingApi.update({
+                        enrollmentMappingApi.update({
                             attribute: value ?? "",
                             key: "unique",
                             value: e.target.checked,
@@ -113,7 +118,7 @@ export default function AttributeMapping() {
             align: "center",
             render: (text, { value }) => (
                 <Checkbox
-                    isChecked={attributeMapping[value ?? ""]?.isCustom}
+                    isChecked={enrollmentMapping[value ?? ""]?.isCustom}
                     onChange={(e: ChangeEvent<HTMLInputElement>) =>
                         setCustom(value ?? "", e.target.checked)
                     }
@@ -127,7 +132,7 @@ export default function AttributeMapping() {
             align: "center",
             render: (text, { value }) => (
                 <Checkbox
-                    isChecked={attributeMapping[value ?? ""]?.isSpecific}
+                    isChecked={enrollmentMapping[value ?? ""]?.isSpecific}
                     onChange={(e: ChangeEvent<HTMLInputElement>) =>
                         setSpecific(value ?? "", e.target.checked)
                     }
@@ -144,19 +149,19 @@ export default function AttributeMapping() {
             ),
             key: "source",
             render: (text, { value, valueType, unique }) => {
-                if (attributeMapping[value ?? ""]?.isCustom) {
+                if (enrollmentMapping[value ?? ""]?.isCustom) {
                     return (
                         <CustomColumn
-                            mapping={attributeMapping}
+                            mapping={enrollmentMapping}
                             onTypeUpdate={(e) =>
-                                attributeMappingApi.update({
+                                enrollmentMappingApi.update({
                                     attribute: `${value}`,
                                     key: "customType",
                                     value: e?.value,
                                 })
                             }
                             onValueChange={(val) =>
-                                attributeMappingApi.update({
+                                enrollmentMappingApi.update({
                                     attribute: `${value}`,
                                     key: "value",
                                     value: val,
@@ -167,12 +172,12 @@ export default function AttributeMapping() {
                     );
                 }
 
-                if (attributeMapping[value ?? ""]?.isSpecific) {
+                if (enrollmentMapping[value ?? ""]?.isSpecific) {
                     return (
                         <Input
-                            value={attributeMapping[value ?? ""]?.value}
+                            value={enrollmentMapping[value ?? ""]?.value}
                             onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                                attributeMappingApi.update({
+                                enrollmentMappingApi.update({
                                     attribute: `${value}`,
                                     key: "value",
                                     value: e.target.value,
@@ -186,19 +191,19 @@ export default function AttributeMapping() {
                         value={metadata.sourceColumns?.find(
                             (val) =>
                                 val.value ===
-                                attributeMapping[value ?? ""]?.value
+                                enrollmentMapping[value ?? ""]?.value
                         )}
                         options={metadata.sourceColumns}
                         isClearable
                         size="md"
                         onChange={(e) => {
-                            attributeMappingApi.updateMany({
+                            enrollmentMappingApi.updateMany({
                                 attribute: value ?? "",
                                 update: {
                                     value: e?.value || "",
                                     unique:
-                                        attributeMapping[value ?? ""]?.unique ||
-                                        unique,
+                                        enrollmentMapping[value ?? ""]
+                                            ?.unique || unique,
                                     valueType,
                                 },
                             });
@@ -230,7 +235,7 @@ export default function AttributeMapping() {
                         <OptionSetMapping
                             value={value ?? ""}
                             destinationOptions={availableOptions || []}
-                            mapping={attributeMapping}
+                            mapping={enrollmentMapping}
                         />
                     );
                 }
@@ -241,7 +246,7 @@ export default function AttributeMapping() {
             title: "Mapped",
             width: "100px",
             render: (text, { value }) => {
-                if (isMapped(value, attributeMapping)) {
+                if (isMapped(value, enrollmentMapping)) {
                     return (
                         <Icon as={FiCheck} color="green.400" fontSize="2xl" />
                     );
@@ -252,71 +257,14 @@ export default function AttributeMapping() {
         },
     ];
 
-    const determineTrackedEntityOptions = () => {
-        if (programMapping.dataSource === "go-data") {
-            return null;
-        }
-
-        return (
-            <Stack spacing="20px" direction="row" alignItems="center">
-                <Text>Tracked Entity Column</Text>
-                <Stack spacing="0">
-                    <Checkbox
-                        isChecked={customTrackedEntityInstanceColumn}
-                        onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                            attributeMappingApi.update({
-                                attribute: "info",
-                                key: "customTrackedEntityInstanceColumn",
-                                value: e.target.checked,
-                            })
-                        }
-                    >
-                        Custom Tracked Entity Column
-                    </Checkbox>
-                    <Box w="500px">
-                        {customTrackedEntityInstanceColumn ? (
-                            <Input
-                                value={trackedEntityInstanceColumn}
-                                onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                                    attributeMappingApi.update({
-                                        attribute: "info",
-                                        key: "trackedEntityInstanceColumn",
-                                        value: e.target.value,
-                                    })
-                                }
-                            />
-                        ) : (
-                            <Select<Option, false, GroupBase<Option>>
-                                value={metadata.sourceColumns.find(
-                                    (val) =>
-                                        val.value ===
-                                        trackedEntityInstanceColumn
-                                )}
-                                options={metadata.sourceColumns}
-                                isClearable
-                                placeholder="Select tracked entity column"
-                                onChange={(e) =>
-                                    attributeMappingApi.update({
-                                        attribute: "info",
-                                        key: "trackedEntityInstanceColumn",
-                                        value: e?.value || "",
-                                    })
-                                }
-                            />
-                        )}
-                    </Box>
-                </Stack>
-            </Stack>
-        );
-    };
     useEffect(() => {
         for (const {
             value: destinationValue,
             unique,
             label: destinationLabel,
             mandatory,
-        } of metadata.destinationAttributes) {
-            if (attributeMapping[destinationValue ?? ""] === undefined) {
+        } of metadata.destinationEnrollmentAttributes) {
+            if (enrollmentMapping[destinationValue ?? ""] === undefined) {
                 const search = metadata.sourceColumns.find(
                     ({ value }) =>
                         value &&
@@ -324,7 +272,7 @@ export default function AttributeMapping() {
                         value.includes(destinationValue)
                 );
                 if (search) {
-                    attributeMappingApi.updateMany({
+                    enrollmentMappingApi.updateMany({
                         attribute: `${destinationValue}`,
                         update: {
                             value: search.value,
@@ -340,7 +288,7 @@ export default function AttributeMapping() {
                             label.includes(destinationLabel)
                     );
                     if (search2) {
-                        attributeMappingApi.updateMany({
+                        enrollmentMappingApi.updateMany({
                             attribute: `${destinationValue}`,
                             update: {
                                 value: search2.value,
@@ -355,15 +303,15 @@ export default function AttributeMapping() {
     }, []);
 
     const setCustom = (attribute: string, manual: boolean) => {
-        const isSpecific = attributeMapping[attribute]?.isSpecific;
-        attributeMappingApi.update({
+        const isSpecific = enrollmentMapping[attribute]?.isSpecific;
+        enrollmentMappingApi.update({
             attribute,
             key: "isCustom",
             value: manual,
         });
 
         if (isSpecific) {
-            attributeMappingApi.update({
+            enrollmentMappingApi.update({
                 attribute,
                 key: "isSpecific",
                 value: !isSpecific,
@@ -372,15 +320,15 @@ export default function AttributeMapping() {
     };
 
     const setSpecific = (attribute: string, isSpecific: boolean) => {
-        attributeMappingApi.update({
+        enrollmentMappingApi.update({
             attribute,
             key: "isSpecific",
             value: isSpecific,
         });
-        const isManual = attributeMapping[attribute]?.isCustom;
+        const isManual = enrollmentMapping[attribute]?.isCustom;
 
         if (isManual) {
-            attributeMappingApi.update({
+            enrollmentMappingApi.update({
                 attribute,
                 key: "isCustom",
                 value: !isManual,
@@ -395,23 +343,32 @@ export default function AttributeMapping() {
             overflow="auto"
             spacing="25px"
         >
-            <Stack direction="row" spacing="20px">
-                {determineTrackedEntityOptions()}
+            <Stack direction="row" spacing="10px">
+                <InfoMapping
+                    customColumn="customEnrollmentIdColumn"
+                    value={enrollmentIdColumn}
+                    column="enrollmentIdColumn"
+                    isChecked={customEnrollmentIdColumn}
+                    update={enrollmentMappingApi.update}
+                    title="Enrollment ID"
+                    title2="Custom Enrollment Column"
+                />
 
+                <InfoMapping
+                    customColumn="customEnrollmentDateColumn"
+                    value={enrollmentDateColumn}
+                    column="enrollmentDateColumn"
+                    isChecked={customEnrollmentDateColumn}
+                    update={enrollmentMappingApi.update}
+                    title="Enrollment Date"
+                    title2="Custom Enrollment Date Column"
+                />
                 <MultipleSelect
-                    title={
-                        <Stack>
-                            <Text>Geometry Column </Text>
-                            <Text fontSize="12px">
-                                Latitudes and Longitudes separated? select two
-                                columns beginning with latitude
-                            </Text>
-                        </Stack>
-                    }
-                    mapping={attributeMapping}
+                    title={<Text>Geometry</Text>}
+                    mapping={programMapping}
                     value="info.geometryColumn"
                     onValueChange={(val) =>
-                        attributeMappingApi.update({
+                        enrollmentMappingApi.update({
                             attribute: "info",
                             key: "geometryColumn",
                             value: val,
@@ -419,39 +376,40 @@ export default function AttributeMapping() {
                     }
                 />
             </Stack>
+
             <Stack spacing={[1, 5]} direction={["column", "row"]}>
                 <Checkbox
                     colorScheme="green"
-                    isChecked={createEntities}
+                    isChecked={createEnrollments}
                     onChange={(e) => {
-                        attributeMappingApi.update({
+                        enrollmentMappingApi.update({
                             attribute: "info",
-                            key: "createEntities",
+                            key: "createEnrollments",
                             value: e.target.checked,
                         });
                     }}
                 >
-                    Create Entities
+                    Create Enrollments
                 </Checkbox>
 
                 <Checkbox
                     colorScheme="green"
-                    isChecked={updateEntities}
+                    isChecked={updateEnrollments}
                     onChange={(e) => {
-                        attributeMappingApi.update({
+                        enrollmentMappingApi.update({
                             attribute: "info",
                             key: "updateEnrollments",
                             value: e.target.checked,
                         });
                     }}
                 >
-                    Update Entities
+                    Update Enrollments
                 </Checkbox>
             </Stack>
             <Search
-                options={metadata.destinationAttributes}
+                options={metadata.destinationEnrollmentAttributes}
                 source={metadata.sourceAttributes}
-                mapping={attributeMapping}
+                mapping={enrollmentMapping}
                 searchString={searchString}
                 setSearchString={setSearchString}
                 action={setCurrentAttributes}
@@ -469,8 +427,9 @@ export default function AttributeMapping() {
                 footer={() => (
                     <Text textAlign="right">
                         Mapped{" "}
-                        {findMapped(attributeMapping, metadata.sourceColumns)}{" "}
-                        of {metadata.destinationAttributes?.length || 0}
+                        {findMapped(enrollmentMapping, metadata.sourceColumns)}{" "}
+                        of{" "}
+                        {metadata.destinationEnrollmentAttributes?.length || 0}
                     </Text>
                 )}
             />

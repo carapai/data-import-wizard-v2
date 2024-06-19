@@ -1,10 +1,9 @@
 import { Stack } from "@chakra-ui/react";
 import { useDataEngine } from "@dhis2/app-runtime";
-import { Tree } from "antd";
+import { TreeSelect } from "antd";
 import arrayToTree from "array-to-tree";
 import { useLiveQuery } from "dexie-react-hooks";
 import { flatten } from "lodash";
-import React, { useState } from "react";
 import { db } from "../db";
 
 const OUTree = ({
@@ -17,12 +16,6 @@ const OUTree = ({
     const engine = useDataEngine();
     const organisations = useLiveQuery(() => db.organisations.toArray());
     const expandedKeys = useLiveQuery(() => db.expandedKeys.get("1"));
-    const [autoExpandParent, setAutoExpandParent] = useState<boolean>(true);
-    const [checkedKeys, setCheckedKeys] = useState<
-        { checked: React.Key[]; halfChecked: React.Key[] } | React.Key[]
-    >(() => {
-        return { checked: value, halfChecked: [] };
-    });
 
     const onLoadData = async ({ id, children }: any) => {
         if (children) {
@@ -69,55 +62,20 @@ const OUTree = ({
             console.log(e);
         }
     };
-    const onExpand = async (expandedKeysValue: React.Key[]) => {
-        await db.expandedKeys.put({
-            id: "1",
-            name: expandedKeysValue.join(","),
-        });
-        setAutoExpandParent(false);
-    };
-
-    const onCheck = async (
-        checkedKeysValue:
-            | { checked: React.Key[]; halfChecked: React.Key[] }
-            | React.Key[]
-    ) => {
-        let allChecked = [];
-        if (Array.isArray(checkedKeysValue)) {
-            allChecked = checkedKeysValue;
-        } else {
-            allChecked = checkedKeysValue.checked;
-        }
-        setCheckedKeys(checkedKeysValue);
-        onChange(allChecked.map((val) => String(val)));
-    };
     return (
-        <Stack spacing="20px">
+        <Stack spacing="20px" width="400px">
             {organisations !== undefined && (
-                <Stack direction="row">
-                    <Tree
-                        checkable
-                        onExpand={onExpand}
-                        checkStrictly
-                        expandedKeys={
-                            expandedKeys !== undefined
-                                ? expandedKeys.name.split(",")
-                                : []
-                        }
-                        autoExpandParent={autoExpandParent}
-                        onCheck={onCheck}
-                        checkedKeys={checkedKeys}
-                        loadData={onLoadData}
-                        style={{
-                            maxHeight: "400px",
-                            overflow: "auto",
-                            fontSize: "18px",
-                        }}
-                        treeData={arrayToTree(organisations, {
-                            parentProperty: "pId",
-                        })}
-                    />
-                </Stack>
+                <TreeSelect
+                    treeData={arrayToTree(organisations, {
+                        parentProperty: "pId",
+                    })}
+                    loadData={onLoadData}
+                    value={value}
+                    onChange={(value) => {
+                        onChange(value);
+                    }}
+                    multiple
+                />
             )}
         </Stack>
     );
