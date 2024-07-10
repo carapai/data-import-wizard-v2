@@ -44,7 +44,7 @@ export default function AggImportSummary() {
     const mapping = useStore($mapping);
     const [count, setCount] = useState(0);
     const data = useStore($data);
-    const ouMapping = useStore($organisationUnitMapping);
+    const organisationUnitMapping = useStore($organisationUnitMapping);
     const attributionMapping = useStore($attributionMapping);
     const dataMapping = useStore($attributeMapping);
 
@@ -225,12 +225,12 @@ export default function AggImportSummary() {
         } else {
             await processAggregateData({
                 mapping,
-                ouMapping,
+                organisationUnitMapping,
                 attributionMapping,
                 engine,
                 data,
-                dataCallback: async (dataValues) => {
-                    await insertChunk(dataValues);
+                dataCallback: async ({ validData }) => {
+                    await insertChunk(validData);
                     const completions = findUniqueDataSetCompletions(
                         mapping.aggregate?.dataSet ?? "",
                         processedData

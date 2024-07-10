@@ -1,6 +1,6 @@
-import { Box, Stack, Text } from "@chakra-ui/react";
+import { Box, Stack } from "@chakra-ui/react";
 import { GroupBase, Select } from "chakra-react-select";
-import { Mapping, Option } from "data-import-wizard-utils";
+import { Option } from "data-import-wizard-utils";
 import { useStore } from "effector-react";
 import { getOr } from "lodash/fp";
 import { $metadata } from "../Store";
@@ -10,11 +10,13 @@ export default function MultipleSelect({
     mapping,
     onValueChange,
     title,
+    placeholder = "Select column",
 }: {
     value: string;
     mapping: any;
     onValueChange: (e: string) => void;
     title: React.ReactElement;
+    placeholder?: string;
 }) {
     const metadata = useStore($metadata);
     return (
@@ -31,7 +33,7 @@ export default function MultipleSelect({
                     isMulti
                     options={metadata.sourceColumns}
                     isClearable
-                    placeholder="Select tracked entity column"
+                    placeholder={placeholder}
                     onChange={(e) =>
                         onValueChange(e.map((x) => x.value ?? "").join(","))
                     }

@@ -31,7 +31,6 @@ export default function FileUpload({
                 if (result && type === "json") {
                     dataApi.changeData(JSON.parse(String(result)));
                 } else {
-                    console.log("Are we here");
                     const workbook = read(e.target?.result, {
                         type: "array",
                         raw: true,
@@ -48,6 +47,7 @@ export default function FileUpload({
                         workbook.SheetNames[0],
                         extraction
                     );
+                    console.log(actual);
                     dataApi.changeData(actual);
                 }
             };

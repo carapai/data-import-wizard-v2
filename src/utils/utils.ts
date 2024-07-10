@@ -491,7 +491,7 @@ export const isMapped = (value: any, mapping: Mapping) => {
 
 export const processAggregateData = async ({
     mapping,
-    ouMapping,
+    organisationUnitMapping,
     dataMapping,
     data,
     attributionMapping,
@@ -500,13 +500,18 @@ export const processAggregateData = async ({
     dataCallback,
 }: {
     mapping: Partial<IMapping>;
-    ouMapping: Mapping;
+    organisationUnitMapping: Mapping;
     dataMapping: Mapping;
     data: any[];
     attributionMapping: Mapping;
     setMessage: React.Dispatch<React.SetStateAction<string>>;
     engine: any;
-    dataCallback: (aggDataValue: AggDataValue[]) => Promise<void>;
+    dataCallback: ({
+        validData,
+    }: {
+        validData: Array<AggDataValue>;
+        invalidData: any[];
+    }) => Promise<void>;
 }) => {
     if (
         [
@@ -519,7 +524,7 @@ export const processAggregateData = async ({
         await dataCallback(
             convertToAggregate({
                 mapping,
-                ouMapping,
+                organisationUnitMapping,
                 dataMapping,
                 data,
                 attributionMapping,
@@ -559,8 +564,8 @@ export const processAggregateData = async ({
                     );
                     await dataCallback(
                         convertToAggregate({
-                            mapping: mapping,
-                            ouMapping,
+                            mapping,
+                            organisationUnitMapping,
                             dataMapping,
                             data: data.dataValues,
                             attributionMapping,
@@ -632,8 +637,8 @@ export const processAggregateData = async ({
                     );
                     dataCallback(
                         convertToAggregate({
-                            mapping: mapping,
-                            ouMapping,
+                            mapping,
+                            organisationUnitMapping,
                             dataMapping,
                             data: finalData,
                             attributionMapping,
@@ -677,6 +682,22 @@ export const aggregateDataColumns: ColumnsType<AggDataValue> = [
         key: "value",
     },
 ];
+
+export const invalidDataColumns = (
+    invalidData: any[] | undefined
+): ColumnsType<any> => {
+    if (invalidData && invalidData.length > 0) {
+        const keys = Object.keys(invalidData[0]);
+        return keys.map((key) => {
+            return {
+                title: key,
+                dataIndex: key,
+                key,
+            };
+        });
+    }
+    return [];
+};
 
 export const hasAttribution = (dataSet: Partial<IDataSet>) => {
     const categories = dataSet.categoryCombo?.categories.filter(

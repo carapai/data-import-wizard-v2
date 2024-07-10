@@ -1,4 +1,4 @@
-import { Stack, Text } from "@chakra-ui/react";
+import { Box, Stack, Text } from "@chakra-ui/react";
 import { GroupBase, Select, SingleValue } from "chakra-react-select";
 import { Extraction, Option } from "data-import-wizard-utils";
 import { useStore } from "effector-react";
@@ -33,18 +33,19 @@ export default function ExcelUpload({
     };
 
     return (
-        <Stack spacing="30px">
+        <Stack spacing="30px" direction="row" alignItems="center">
             <FileUpload type="xlsx" extraction={extraction} />
-            <Stack>
+            <Stack direction="row" alignItems="center" flex={1}>
                 <Text>Excel sheet</Text>
-                <Select<Option, false, GroupBase<Option>>
-                    value={sheets.find((pt) => pt.value === mapping.sheet)}
-                    onChange={(e) => changeSheet(e)}
-                    options={sheets}
-                    isClearable
-                    menuPlacement="auto"
-                    size="sm"
-                />
+                <Box flex={1}>
+                    <Select<Option, false, GroupBase<Option>>
+                        value={sheets.find((pt) => pt.value === mapping.sheet)}
+                        onChange={(e) => changeSheet(e)}
+                        options={sheets}
+                        isClearable
+                        menuPlacement="auto"
+                    />
+                </Box>
             </Stack>
             {children}
         </Stack>

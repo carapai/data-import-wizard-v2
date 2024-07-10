@@ -26,9 +26,9 @@ export default function InfoMapping({
 }) {
     const metadata = useStore($metadata);
     return (
-        <Stack spacing="20px" direction="row" alignItems="center">
+        <Stack spacing="20px" direction="row" alignItems="center" flex={1}>
             <Text>{title}</Text>
-            <Stack spacing="0">
+            <Stack spacing="0" flex={1}>
                 <Checkbox
                     isChecked={isChecked}
                     onChange={(e: ChangeEvent<HTMLInputElement>) =>
@@ -41,7 +41,7 @@ export default function InfoMapping({
                 >
                     {title2}
                 </Checkbox>
-                <Box w="500px">
+                <Box>
                     {isChecked ? (
                         <Input
                             value={value}

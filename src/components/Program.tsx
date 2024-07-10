@@ -1,13 +1,11 @@
-import { Stack, useDisclosure, useToast } from "@chakra-ui/react";
+import { Stack, useToast } from "@chakra-ui/react";
 import { useDataEngine } from "@dhis2/app-runtime";
 import { useNavigate } from "@tanstack/react-location";
-import { IProgram, Option, Step } from "data-import-wizard-utils";
+import { Option, Step } from "data-import-wizard-utils";
 import { useStore } from "effector-react";
-import { getOr } from "lodash/fp";
 import { LocationGenerics } from "../Interfaces";
 
-import { activeStepsApi, mappingApi, processor, programApi } from "../Events";
-import { loadProgram } from "../Queries";
+import { activeStepsApi, mappingApi, processor } from "../Events";
 import {
     $action,
     $attributeMapping,
@@ -39,18 +37,17 @@ import { saveProgramMapping } from "../utils/utils";
 import ImportExportOptions from "./ImportExportOptions";
 import MappingDetails from "./MappingDetails";
 import OrganisationUnitMapping from "./OrganisationUnitMapping";
-import AttributeMapping from "./program/AttributeMapping";
-import EventMapping from "./program/EventMapping";
-import MappingOptions from "./program/MappingOptions";
-import { OtherSystemMapping } from "./program/OtherSystemMapping";
 import Preview from "./previews/Preview";
+import AttributeMapping from "./program/AttributeMapping";
+import EnrollmentMapping from "./program/EnrollmentMapping";
+import EventMapping from "./program/EventMapping";
+import { OtherSystemMapping } from "./program/OtherSystemMapping";
 import ImportSummary from "./program/ProgramImportSummary";
 import ProgramSelect from "./program/ProgramSelect";
 import RemoteOutbreaks from "./RemoteOutbreak";
 import RemoteProgramSelect from "./RemoteProgramSelect";
 import StepperButtons from "./StepperButtons";
 import StepsDisplay from "./StepsDisplay";
-import EnrollmentMapping from "./program/EnrollmentMapping";
 
 const importTypes: Option[] = [
     { value: "dhis2-program", label: "dhis2-program" },
@@ -76,37 +73,7 @@ const Program = () => {
     const action = useStore($action);
     const engine = useDataEngine();
     const names = useStore($names);
-    const { isOpen, onOpen, onClose } = useDisclosure();
     const navigate = useNavigate<LocationGenerics>();
-
-    const onProgramSelect = async (id?: string) => {
-        if (id) {
-            onOpen();
-            let data = await loadProgram<IProgram>({
-                engine,
-                id,
-                fields: "id,name,trackedEntityType[id,featureType,trackedEntityTypeAttributes[id,trackedEntityAttribute[id,name,code,unique,generated,pattern,confidential,valueType,optionSetValue,displayFormName,optionSet[id,name,options[id,name,code]]]]],programType,featureType,organisationUnits[id,code,name,parent[name,parent[name,parent[name,parent[name,parent[name]]]]]],programStages[id,repeatable,featureType,name,code,programStageDataElements[id,compulsory,name,dataElement[id,name,code,optionSetValue,optionSet[id,name,options[id,name,code]]]]],programTrackedEntityAttributes[id,mandatory,sortOrder,allowFutureDate,trackedEntityAttribute[id,name,code,unique,generated,pattern,confidential,valueType,optionSetValue,displayFormName,optionSet[id,name,options[id,name,code]]]]",
-                resource: "programs",
-            });
-
-            const other = programMapping.isSource
-                ? { source: data.name }
-                : { destination: data.name };
-            mappingApi.update({
-                attribute: "program",
-                value: {
-                    ...programMapping.program,
-                    trackedEntityType: getOr("", "trackedEntityType.id", data),
-                    program: id,
-                    programType: getOr("", "programType", data),
-                    ...other,
-                },
-            });
-            programApi.set(data);
-            onClose();
-            stepper.next();
-        }
-    };
 
     const steps: Step[] = [
         {
@@ -118,24 +85,9 @@ const Program = () => {
         },
         {
             label: `${name} Program`,
-            content: (
-                <ProgramSelect
-                    isOpen={isOpen}
-                    onClose={onClose}
-                    onOpen={onOpen}
-                    onProgramSelect={onProgramSelect}
-                    message="Loading Selected Program"
-                />
-            ),
+            content: <ProgramSelect />,
             nextLabel: "Next Step",
             id: 3,
-            lastLabel: "Go to Mappings",
-        },
-        {
-            label: "Mapping Options",
-            content: <MappingOptions />,
-            nextLabel: "Next Step",
-            id: 4,
             lastLabel: "Go to Mappings",
         },
         {
@@ -211,12 +163,8 @@ const Program = () => {
     ];
 
     const activeSteps = () => {
-        const {
-            info: { createEntities, updateEntities } = {
-                createEntities: true,
-                updateEntities: true,
-            },
-        } = attributeMapping;
+        const preview = programMapping.prefetch ? [12] : [];
+        const noPreview = programMapping.prefetch ? [] : [12];
         const activeSteps = steps.filter(({ id }) => {
             if (
                 programMapping.dataSource !== "dhis2-program" &&
@@ -224,9 +172,9 @@ const Program = () => {
             ) {
                 if (programMapping.dataSource === "api") {
                     if (programMapping.prefetch) {
-                        return [1, 2, 3, 7, 9, 10, 11].indexOf(id) !== -1;
+                        return [1, 2, 3, 7, 9, 10, 11, 15].indexOf(id) !== -1;
                     }
-                    return [1, 2, 3, 7, 9, 11].indexOf(id) !== -1;
+                    return [1, 2, 3, 7, 9, 11, 15].indexOf(id) !== -1;
                 }
                 if (programMapping.dataSource === "go-data") {
                     if (programMapping.isSource) {
@@ -234,13 +182,11 @@ const Program = () => {
                             [1, 2, 3, 5, 7, 8, 11, 12, 13].indexOf(id) !== -1
                         );
                     } else {
-                        if (programMapping.prefetch) {
-                            return (
-                                [1, 2, 3, 5, 7, 8, 11, 12, 13].indexOf(id) !==
-                                -1
-                            );
-                        }
-                        return [1, 2, 3, 5, 7, 8, 13].indexOf(id) !== -1;
+                        return (
+                            [1, 2, 3, 5, 7, 8, 13, 15, ...preview].indexOf(
+                                id
+                            ) !== -1
+                        );
                     }
                 }
                 if (
@@ -249,31 +195,35 @@ const Program = () => {
                         programMapping.dataSource
                     ) !== -1
                 ) {
-                    return [2, 3, 11].indexOf(id) !== -1;
+                    return [2, 3, 11, ...preview].indexOf(id) !== -1;
                 }
-                if (programMapping.prefetch) {
-                    return [1, 2, 3, 9, 10, 11].indexOf(id) !== -1;
-                }
-                return [1, 2, 3, 11].indexOf(id) !== -1;
+                return [1, 2, 3, 11, ...preview].indexOf(id) !== -1;
             }
 
             if (programMapping.dataSource === "dhis2-program") {
-                if (programMapping.prefetch) {
-                    return [5, 4, 8].indexOf(id) === -1;
-                }
-                return [5, 4, 8, 12].indexOf(id) === -1;
+                const remove =
+                    programMapping.program?.programType ===
+                    "WITHOUT_REGISTRATION"
+                        ? [9, 15]
+                        : [];
+
+                return [5, 8, ...remove, ...noPreview].indexOf(id) === -1;
             }
             if (programMapping.dataSource === "go-data") {
                 if (
                     programMapping.program?.programType ===
                     "WITHOUT_REGISTRATION"
                 ) {
-                    return [4, 6, 8, 9, 11].indexOf(id) === -1;
+                    return [6, 8, 9, 11, 15].indexOf(id) === -1;
                 }
-                return [4, 6, 8, 11].indexOf(id) === -1;
+                return [6, 8, 11].indexOf(id) === -1;
             }
+            const include =
+                programMapping.program?.programType === "WITHOUT_REGISTRATION"
+                    ? []
+                    : [9, 15];
 
-            return [1, 2, 3, 4, 7, 9, 10, 12, 13].indexOf(id) !== -1;
+            return [1, 2, 3, 7, 10, 11, 12, 13, ...include].indexOf(id) !== -1;
         });
         activeStepsApi.set(activeSteps);
         return activeSteps;
@@ -312,7 +262,6 @@ const Program = () => {
             duration: 9000,
             isClosable: true,
         });
-        // return result;
     };
     const onFinish = async () => {
         if (
@@ -354,7 +303,7 @@ const Program = () => {
                 disabled={disabled}
             />
             <StepperButtons
-                disabled={false}
+                disabled={disabled}
                 steps={activeSteps()}
                 onNext={onNext}
                 onSave={onSave}

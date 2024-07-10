@@ -28,7 +28,8 @@ import axios from "axios";
 import { GroupBase, Select } from "chakra-react-select";
 import { generateUid, ISchedule, Option } from "data-import-wizard-utils";
 import dayjs from "dayjs";
-import { ChangeEvent, useState } from "react";
+import e from "express";
+import { ChangeEvent, useEffect, useState } from "react";
 import { useNamespace } from "../Queries";
 import ProgramMappingSelect from "./ProgramMappingSelect";
 
@@ -130,19 +131,43 @@ const Schedule = () => {
 
     const start = async (schedule: Partial<ISchedule>) => {
         if (schedule.id && schedule.schedule && schedule.schedulingSeverURL) {
-            await axios.post(`${schedule.schedulingSeverURL}/start`, schedule);
+            const { data } = await axios.post(
+                `${schedule.schedulingSeverURL}`,
+                {
+                    scheduleId: schedule.id,
+                    cronExpression: schedule.schedule,
+                    mapping: schedule.mapping,
+                }
+            );
+
+            console.log(data);
             await update({ status: "running" });
         }
     };
 
     const stop = async (schedule: Partial<ISchedule>) => {
         if (schedule.id && schedule.schedule && schedule.schedulingSeverURL) {
-            await axios.post(`${schedule.schedulingSeverURL}/stop`, {
-                id: schedule.id,
-            });
+            await axios.post(
+                `${schedule.schedulingSeverURL}/jobs/${schedule.id}/stop`,
+                {
+                    id: schedule.id,
+                }
+            );
             await update({ status: "stopped" });
         }
     };
+
+    useEffect(() => {
+        const eventSource = new EventSource(`http://localhost:3003/sse`);
+        eventSource.onmessage = (e) => {
+            console.log("===== This is not nice =====");
+            console.log(e.data);
+        };
+        return () => {
+            eventSource.close();
+        };
+    }, []);
+
     return (
         <Stack p="10px">
             <Box textAlign="right" h="48px">
@@ -219,15 +244,12 @@ const Schedule = () => {
                                                     Delete
                                                 </Button>
                                             )}
-                                            {(s.status === "scheduled" ||
-                                                s.status === "running") && (
-                                                <Button
-                                                    size="xs"
-                                                    onClick={() => stop(s)}
-                                                >
-                                                    Stop
-                                                </Button>
-                                            )}
+                                            <Button
+                                                size="xs"
+                                                onClick={() => stop(s)}
+                                            >
+                                                Stop
+                                            </Button>
                                         </Stack>
                                     </Td>
                                 </Tr>
@@ -248,9 +270,9 @@ const Schedule = () => {
                 <ModalContent>
                     <ModalHeader>New Schedule</ModalHeader>
                     <ModalCloseButton />
-                    <ModalBody m="0" p="10px">
+                    <ModalBody p="20px">
                         <Stack>
-                            <Stack spacing="30px">
+                            <Stack spacing="10px">
                                 <Stack>
                                     <Text>Schedule Name</Text>
                                     <Input

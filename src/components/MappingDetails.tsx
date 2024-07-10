@@ -79,7 +79,7 @@ export default function MappingDetails({
             >
                 Current DHIS2 Instance is Source
             </Checkbox>
-            <Stack>
+            <Stack direction="row" alignItems="center">
                 <Text>
                     {mapping.isSource ? "Export Data To" : "Import From"}
                 </Text>
@@ -97,7 +97,8 @@ export default function MappingDetails({
                     {mapping.dataSource &&
                         ["xlsx-line-list", "xlsx-tabular-data"].indexOf(
                             mapping.dataSource
-                        ) !== -1 && (
+                        ) !== -1 &&
+                        !mapping.isSource && (
                             <Checkbox
                                 isChecked={mapping.useColumnLetters}
                                 onChange={(e: ChangeEvent<HTMLInputElement>) =>
@@ -110,27 +111,27 @@ export default function MappingDetails({
                                 Use column letters
                             </Checkbox>
                         )}
+                    {mapping.dataSource &&
+                        [
+                            "dhis2-data-set",
+                            "dhis2-indicators",
+                            "dhis2-program-indicators",
+                            "manual-dhis2-program-indicators",
+                            "dhis2-program",
+                        ].indexOf(mapping.dataSource) !== -1 && (
+                            <Checkbox
+                                isChecked={mapping.isCurrentInstance}
+                                onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                                    mappingApi.update({
+                                        attribute: "isCurrentInstance",
+                                        value: e.target.checked,
+                                    })
+                                }
+                            >
+                                Use current DHIS2 Instance
+                            </Checkbox>
+                        )}
                 </Stack>
-                {mapping.dataSource &&
-                    [
-                        "dhis2-data-set",
-                        "dhis2-indicators",
-                        "dhis2-program-indicators",
-                        "manual-dhis2-program-indicators",
-                        "dhis2-program",
-                    ].indexOf(mapping.dataSource) !== -1 && (
-                        <Checkbox
-                            isChecked={mapping.isCurrentInstance}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                                mappingApi.update({
-                                    attribute: "isCurrentInstance",
-                                    value: e.target.checked,
-                                })
-                            }
-                        >
-                            Use current DHIS2 Instance
-                        </Checkbox>
-                    )}
             </Stack>
 
             <InitialMapping
@@ -149,20 +150,6 @@ export default function MappingDetails({
                 }
                 extraction={mapping.useColumnLetters ? "column" : undefined}
             />
-
-            {/* {getData(
-                mapping.isCurrentInstance &&
-                    [
-                        "dhis2-data-set",
-                        "dhis2-indicators",
-                        "dhis2-program-indicators",
-                        "manual-dhis2-program-indicators",
-                        "dhis2-program",
-                    ].indexOf(mapping.dataSource ?? "") !== -1
-                    ? undefined
-                    : mapping.dataSource,
-                mapping.useColumnLetters ? "column" : undefined
-            )} */}
         </Stack>
     );
 }

@@ -1,6 +1,5 @@
 import { AddIcon, DeleteIcon } from "@chakra-ui/icons";
 import {
-    Button,
     Checkbox,
     IconButton,
     Input,
@@ -18,15 +17,14 @@ import {
     Th,
     Thead,
     Tr,
-    useDisclosure,
 } from "@chakra-ui/react";
 import { Authentication, IMapping, Option } from "data-import-wizard-utils";
 import { useStore } from "effector-react";
 import { isArray } from "lodash";
 import { getOr } from "lodash/fp";
-import { ChangeEvent, useRef, useState } from "react";
+import { ChangeEvent, useRef } from "react";
 import { mappingApi } from "../Events";
-import { $mapping, $metadataAuthApi } from "../Store";
+import { $mapping } from "../Store";
 
 const AddableValues = ({
     accessor,
@@ -163,15 +161,7 @@ export default function APICredentials({
     accessor: keyof IMapping;
 }) {
     const mapping = useStore($mapping);
-    const {
-        isOpen: isOpenModal,
-        onOpen: onOpenModal,
-        onClose: onCloseModal,
-    } = useDisclosure();
-    const [fetching, setFetching] = useState<boolean>(false);
-
     const inputRef = useRef<HTMLInputElement>(null);
-    const metadataAuthApi = useStore($metadataAuthApi);
     const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
             let fileReader = new FileReader();
@@ -195,94 +185,78 @@ export default function APICredentials({
         }
     };
 
-    const onOK = async () => {
-        setFetching(() => true);
-        // try {
-        //     const { data } = await metadataAuthApi.get("");
-        //     if (mapping.responseKey) {
-        //         updateMapping({
-        //             attribute: "metadataOptions.",
-        //             value: data[mapping.responseKey],
-        //         });
-        //     } else {
-        //         updateMapping({
-        //             attribute: "metadataOptions.metadata",
-        //             value: data,
-        //         });
-        //     }
-        // } catch (error: any) {
-        //     toast({
-        //         title: "Fetch Failed",
-        //         description: error?.message,
-        //         status: "error",
-        //         duration: 9000,
-        //         isClosable: true,
-        //     });
-        // }
-        setFetching(() => false);
-        onCloseModal();
-    };
-
     return (
         <Stack spacing="20px">
-            <Stack>
-                <Text>URL</Text>
-                <Input
-                    required
-                    value={mapping.authentication?.url ?? ""}
-                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                        mappingApi.update({
-                            attribute: "authentication",
-                            value: e.target.value,
-                            path: "url",
-                        })
-                    }
-                />
-            </Stack>
-
-            <Checkbox
-                isChecked={mapping.authentication?.basicAuth}
-                onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                    mappingApi.update({
-                        attribute: "authentication",
-                        value: e.target.checked,
-                        path: "basicAuth",
-                    })
-                }
-            >
-                Basic Authentication
-            </Checkbox>
-            {mapping.authentication?.basicAuth && (
-                <Stack direction="row" spacing="20px">
-                    <Stack w="50%">
-                        <Text>Username</Text>
-                        <Input
-                            value={mapping.authentication?.username ?? ""}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                                mappingApi.update({
-                                    attribute: "authentication",
-                                    value: e.target.value,
-                                    path: "username",
-                                })
-                            }
-                        />
-                    </Stack>
-                    <Stack w="50%">
-                        <Text>Password</Text>
-                        <Input
-                            type="password"
-                            value={mapping.authentication?.password ?? ""}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                                mappingApi.update({
-                                    attribute: "authentication",
-                                    value: e.target.value,
-                                    path: "password",
-                                })
-                            }
-                        />
-                    </Stack>
+            <Stack direction="row" justifyItems="center" spacing="30px">
+                <Stack direction="row" alignItems="center" w="33%">
+                    <Text>URL</Text>
+                    <Input
+                        required
+                        value={mapping.authentication?.url ?? ""}
+                        onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                            mappingApi.update({
+                                attribute: "authentication",
+                                value: e.target.value,
+                                path: "url",
+                            })
+                        }
+                    />
                 </Stack>
-            )}
+
+                <Stack flex={1} direction="row">
+                    <Checkbox
+                        isChecked={mapping.authentication?.basicAuth}
+                        onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                            mappingApi.update({
+                                attribute: "authentication",
+                                value: e.target.checked,
+                                path: "basicAuth",
+                            })
+                        }
+                    >
+                        Basic Authentication
+                    </Checkbox>
+                    {mapping.authentication?.basicAuth && (
+                        <Stack direction="row" spacing="20px" flex={1}>
+                            <Stack w="50%" direction="row" alignItems="center">
+                                <Text>Username</Text>
+                                <Input
+                                    value={
+                                        mapping.authentication?.username ?? ""
+                                    }
+                                    onChange={(
+                                        e: ChangeEvent<HTMLInputElement>
+                                    ) =>
+                                        mappingApi.update({
+                                            attribute: "authentication",
+                                            value: e.target.value,
+                                            path: "username",
+                                        })
+                                    }
+                                />
+                            </Stack>
+                            <Stack w="50%" direction="row" alignItems="center">
+                                <Text>Password</Text>
+                                <Input
+                                    type="password"
+                                    value={
+                                        mapping.authentication?.password ?? ""
+                                    }
+                                    onChange={(
+                                        e: ChangeEvent<HTMLInputElement>
+                                    ) =>
+                                        mappingApi.update({
+                                            attribute: "authentication",
+                                            value: e.target.value,
+                                            path: "password",
+                                        })
+                                    }
+                                />
+                            </Stack>
+                        </Stack>
+                    )}
+                </Stack>
+            </Stack>
 
             <Tabs>
                 <TabList>
@@ -321,40 +295,8 @@ export default function APICredentials({
                             Prefetch Data
                         </Checkbox>
                     )}
-                    {getOr(false, "dataSource", mapping) === "api" &&
-                        getOr(false, "isSource", mapping) && (
-                            <Stack direction="row" spacing="20px">
-                                <Button
-                                    onClick={() => inputRef.current?.click()}
-                                >
-                                    Upload Metadata
-                                </Button>
-                                <Button onClick={() => onOpenModal()}>
-                                    Query Metadata from API
-                                </Button>
-                                {/* <APICredentialsModal
-                                    isOpen={isOpenModal}
-                                    onClose={onCloseModal}
-                                    updateMapping={updateMapping}
-                                    onOK={onOK}
-                                    mapping={mapping}
-                                    accessor="metadataApiAuthentication"
-                                    fetching={fetching}
-                                    labelField="metadataOptions.labelField"
-                                    valueField="metadataOptions.valueField"
-                                /> */}
-
-                                <input
-                                    style={{ display: "none" }}
-                                    ref={inputRef}
-                                    type="file"
-                                    onChange={handleFileChange}
-                                />
-                            </Stack>
-                        )}
                 </Stack>
             )}
-            {/* <MetadataOptions /> */}
         </Stack>
     );
 }

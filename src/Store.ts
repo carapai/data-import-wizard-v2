@@ -9,7 +9,7 @@ import {
     IGoData,
     IMapping,
     IProgram,
-    isDisabled,
+    makeProgramTypes,
     label,
     makeMetadata,
     makeRemoteApi,
@@ -102,6 +102,7 @@ export const $otherName = $mapping.map((state) => {
 });
 
 export const $processedData = domain.createStore<AggDataValue[]>([]);
+export const $invalidData = domain.createStore<any[]>([]);
 
 const all: { [key: string]: string[] } = {
     "csv-line-list": [
@@ -209,7 +210,7 @@ export const $metadataAuthApi = $mapping.map((state) =>
 );
 export const $dhis2Program = domain.createStore<Partial<IProgram>>({});
 
-export const $programTypes = $program.map((state) => makeValidation(state));
+export const $programTypes = $program.map((state) => makeProgramTypes(state));
 export const $goData = domain.createStore<Partial<IGoData>>({});
 
 export const $tokens = domain.createStore<Dictionary<string>>({});
@@ -241,6 +242,7 @@ export const $metadata = combine(
         programIndicators: $programIndicators,
         indicators: $indicators,
         enrollmentMapping: $enrollmentMapping,
+        organisationUnitMapping: $organisationUnitMapping,
     },
     ({
         mapping,
@@ -258,6 +260,7 @@ export const $metadata = combine(
         programIndicators,
         indicators,
         enrollmentMapping,
+        organisationUnitMapping,
     }) => {
         return makeMetadata({
             program,
@@ -275,52 +278,46 @@ export const $metadata = combine(
             indicators,
             programIndicators,
             enrollmentMapping,
+            organisationUnitMapping,
         });
     }
 );
 
-// export const $disabled = combine(
-//     $mapping,
-//     $steps,
-//     (aggregateMapping, steps) => false
-// );
-
 export const $disabled = combine(
-    $program,
-    $mapping,
-    $activeSteps,
-    $steps,
-    $programStageMapping,
-    $attributeMapping,
-    $organisationUnitMapping,
-    $enrollmentMapping,
-    $metadata,
-    $data,
-    $hasError,
-    (
+    {
+        program: $program,
+        mapping: $mapping,
+        activeSteps: $activeSteps,
+        steps: $steps,
+        programStageMapping: $programStageMapping,
+        attributeMapping: $attributeMapping,
+        organisationUnitMapping: $organisationUnitMapping,
+        enrollmentMapping: $enrollmentMapping,
+        metadata: $metadata,
+        data: $data,
+        hasError: $hasError,
+    },
+    ({
         program,
         mapping,
         activeSteps,
-        step,
+        steps,
         programStageMapping,
         attributeMapping,
         enrollmentMapping,
         organisationUnitMapping,
         metadata,
         data,
-        hasError
-    ) => {
+        hasError,
+    }) => {
         if (mapping.type === "aggregate") return false;
-        return isDisabled({
+        return makeValidation({
             mapping,
             programStageMapping,
             attributeMapping,
             organisationUnitMapping,
-            step: activeSteps.length > 0 ? activeSteps[step].id : 2,
+            step: activeSteps.length > 0 ? activeSteps[steps].id : 2,
             mySchema: mySchema as any,
-            destinationFields: mapping.isSource
-                ? metadata.destinationColumns
-                : metadata.destinationAttributes,
             data,
             program,
             metadata,

@@ -32,10 +32,18 @@ import {
 import { findMapped, isMapped } from "../utils/utils";
 import { APICredentialsModal } from "./APICredentialsModal";
 import DestinationIcon from "./DestinationIcon";
+import InfoMapping from "./InfoMapping";
 import Progress from "./Progress";
 import Search from "./Search";
 import SourceIcon from "./SourceIcon";
 export default function OrganisationUnitMapping() {
+    const {
+        info: { customOrgUnitColumn, orgUnitColumn } = {
+            customOrgUnitColumn: false,
+            orgUnitColumn: "",
+        },
+        ...organisationUnitMapping
+    } = useStore($organisationUnitMapping);
     const { isOpen, onOpen, onClose } = useDisclosure();
     const engine = useDataEngine();
     const {
@@ -44,15 +52,12 @@ export default function OrganisationUnitMapping() {
         onClose: onCloseModal,
     } = useDisclosure();
     const { source, destination } = useStore($names);
-    const organisationUnitMapping = useStore($organisationUnitMapping);
     const remoteOrganisationApi = useStore($remoteOrganisationApi);
     const [fetching, setFetching] = useState<boolean>(false);
     const [message, setMessage] = useState<string>("");
     const mapping = useStore($mapping);
     const metadata = useStore($metadata);
-    const [querying, setQuerying] = useState<string | undefined>(
-        mapping.orgUnitColumn
-    );
+    const [querying, setQuerying] = useState<string | undefined>(orgUnitColumn);
     const inputRef = useRef<HTMLInputElement>(null);
     const [currentOrganisations, setCurrentOrganisations] = useState(
         metadata.destinationOrgUnits
@@ -150,7 +155,6 @@ export default function OrganisationUnitMapping() {
                         )}
                         options={metadata.sourceOrgUnits}
                         isClearable
-                        size="md"
                         onChange={(e) =>
                             ouMappingApi.update({
                                 attribute: `${value}`,
@@ -167,13 +171,7 @@ export default function OrganisationUnitMapping() {
             title: "Mapped",
             width: "100px",
             render: (text, { value }) => {
-                if (
-                    isMapped(
-                        value,
-                        organisationUnitMapping,
-                        metadata.sourceOrgUnits
-                    )
-                ) {
+                if (isMapped(value, organisationUnitMapping)) {
                     return (
                         <Icon as={FiCheck} color="green.400" fontSize="2xl" />
                     );
@@ -217,10 +215,8 @@ export default function OrganisationUnitMapping() {
         setMessage(() => "Trying to automatically map");
         for (const {
             value: destinationValue,
-            label,
-            code,
         } of metadata.destinationOrgUnits) {
-            if (!organisationUnitMapping[destinationValue ?? ""]) {
+            if (organisationUnitMapping[destinationValue ?? ""] === undefined) {
                 const search = metadata.sourceOrgUnits.find(
                     ({ value, label }) => destinationValue === value
                 );
@@ -234,7 +230,7 @@ export default function OrganisationUnitMapping() {
             }
         }
         onClose();
-    }, [mapping.orgUnitColumn, querying]);
+    }, [orgUnitColumn, querying]);
 
     const onOK = async () => {
         setFetching(() => true);
@@ -257,41 +253,52 @@ export default function OrganisationUnitMapping() {
             maxH="calc(100vh - 350px)"
             overflow="auto"
         >
-            {mapping.dataSource === "api" && (
-                <Stack direction="row" spacing="20px">
-                    <Button onClick={() => inputRef.current?.click()}>
-                        Upload Organisation Metadata List
-                    </Button>
-                    <Button
-                        onClick={() => {
-                            mappingApi.update({
-                                attribute: "orgUnitSource",
-                                value: "api",
-                            });
-                            onOpenModal();
-                        }}
-                    >
-                        Query Metadata from API
-                    </Button>
-                    <APICredentialsModal
-                        isOpen={isOpenModal}
-                        onClose={onCloseModal}
-                        updateMapping={mappingApi.update}
-                        onOK={onOK}
-                        mapping={mapping}
-                        accessor="orgUnitApiAuthentication"
-                        fetching={fetching}
-                        labelField="remoteOrgUnitLabelField"
-                        valueField="remoteOrgUnitValueField"
-                    />
-                    <input
-                        style={{ display: "none" }}
-                        ref={inputRef}
-                        type="file"
-                        onChange={handleFileChange}
-                    />
-                </Stack>
-            )}
+            <Stack direction="row" alignItems="center" spacing="30px">
+                <InfoMapping
+                    customColumn="customOrgUnitColumn"
+                    value={orgUnitColumn}
+                    column="orgUnitColumn"
+                    isChecked={customOrgUnitColumn}
+                    update={ouMappingApi.update}
+                    title="Organisation Column"
+                    title2="Custom Organisation Column"
+                />
+                {mapping.dataSource === "api" && (
+                    <Stack direction="row" spacing="20px">
+                        <Button onClick={() => inputRef.current?.click()}>
+                            Upload Organisation Metadata List
+                        </Button>
+                        <Button
+                            onClick={() => {
+                                mappingApi.update({
+                                    attribute: "orgUnitSource",
+                                    value: "api",
+                                });
+                                onOpenModal();
+                            }}
+                        >
+                            Query Metadata from API
+                        </Button>
+                        <APICredentialsModal
+                            isOpen={isOpenModal}
+                            onClose={onCloseModal}
+                            updateMapping={mappingApi.update}
+                            onOK={onOK}
+                            mapping={mapping}
+                            accessor="orgUnitApiAuthentication"
+                            fetching={fetching}
+                            labelField="remoteOrgUnitLabelField"
+                            valueField="remoteOrgUnitValueField"
+                        />
+                        <input
+                            style={{ display: "none" }}
+                            ref={inputRef}
+                            type="file"
+                            onChange={handleFileChange}
+                        />
+                    </Stack>
+                )}
+            </Stack>
             <Search
                 options={metadata.destinationOrgUnits}
                 action={setCurrentOrganisations}
@@ -307,7 +314,7 @@ export default function OrganisationUnitMapping() {
                 columns={columns}
                 dataSource={currentOrganisations}
                 rowKey="value"
-                pagination={{ pageSize: 10 }}
+                pagination={{ pageSize: 8 }}
                 size="small"
                 footer={() => (
                     <Text textAlign="right">

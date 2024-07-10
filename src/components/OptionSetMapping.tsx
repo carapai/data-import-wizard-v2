@@ -42,10 +42,12 @@ export default function OptionSetMapping({
     destinationOptions,
     value,
     mapping,
+    disabled,
 }: {
     destinationOptions: Option[];
     mapping: Mapping;
     value: string;
+    disabled: boolean;
 }) {
     const { isOpen, onOpen, onClose } = useDisclosure();
     const currentSourceOptions = useStore($currentSourceOptions);
@@ -170,6 +172,7 @@ export default function OptionSetMapping({
                         destinationOptions
                     );
                 }}
+                isDisabled={disabled}
             >
                 Map Options
             </Button>

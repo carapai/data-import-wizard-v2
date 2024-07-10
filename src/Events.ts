@@ -39,6 +39,7 @@ import {
     $goData,
     $goDataOptions,
     $indicators,
+    $invalidData,
     $mapping,
     $metadata,
     $optionMapping,
@@ -353,6 +354,10 @@ export const indicatorApi = createApi($indicators, {
 export const processedDataApi = createApi($processedData, {
     set: (_, data: Array<AggDataValue>) => data,
     add: (state, data: Array<AggDataValue>) => [...state, ...data],
+});
+export const invalidDataApi = createApi($invalidData, {
+    set: (_, data: Array<any>) => data,
+    add: (state, data: Array<any>) => [...state, ...data],
 });
 
 export const attributionMappingApi = createApi($attributionMapping, {

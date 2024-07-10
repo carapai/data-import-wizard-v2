@@ -1,17 +1,15 @@
-import { Checkbox, Stack, Text, Box } from "@chakra-ui/react";
+import { Checkbox, Input, Stack, Text } from "@chakra-ui/react";
+import { DisabledPeriod } from "data-import-wizard-utils";
 import { useStore } from "effector-react";
+import { getOr } from "lodash/fp";
 import { ChangeEvent, useEffect } from "react";
-import { GroupBase, Select } from "chakra-react-select";
-import { DisabledPeriod, Option } from "data-import-wizard-utils";
 import { mappingApi } from "../../Events";
-import { $mapping, $metadata } from "../../Store";
+import { $mapping } from "../../Store";
 import OUTree from "../OuTree";
 import PeriodPicker from "../PeriodPicker";
 import SwitchComponent, { Case } from "../SwitchComponent";
-import { getOr } from "lodash/fp";
 export default function DHIS2AsSourceOptions() {
     const mapping = useStore($mapping);
-    const metadata = useStore($metadata);
     const findDisabled = (): DisabledPeriod[] => {
         if (mapping.dataSource === "dhis2-data-set") {
             return [0];
@@ -165,6 +163,25 @@ export default function DHIS2AsSourceOptions() {
                     }
                 />
             </Stack>
+
+            {mapping.program?.programType === "WITH_REGISTRATION" && (
+                <Stack>
+                    <Text>Tracked Entities</Text>
+                    <Input
+                        value={
+                            mapping.dhis2SourceOptions?.trackedEntityInstance ??
+                            ""
+                        }
+                        onChange={(value) =>
+                            mappingApi.update({
+                                attribute: "dhis2SourceOptions",
+                                path: "trackedEntityInstance",
+                                value: value.target.value,
+                            })
+                        }
+                    />
+                </Stack>
+            )}
 
             {/* <Checkbox
                 isChecked={mapping.dhis2SourceOptions?.useAnalytics}

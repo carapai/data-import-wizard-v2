@@ -8,16 +8,16 @@ import { useEffect } from "react";
 import { $mapping } from "../../Store";
 
 import {
-    mappingApi,
     dataSetApi,
     indicatorApi,
+    mappingApi,
     programIndicatorApi,
 } from "../../Events";
 import { getDHIS2Resource, loadProgram, useDHIS2Metadata } from "../../Queries";
 import { stepper } from "../../Store";
+import { hasAttribution } from "../../utils/utils";
 import Loader from "../Loader";
 import Progress from "../Progress";
-import { hasAttribution } from "../../utils/utils";
 
 export default function DataSetSelect() {
     const mapping = useStore($mapping);
@@ -48,7 +48,7 @@ export default function DataSetSelect() {
                 resource: "dataSets",
                 engine,
                 id,
-                fields: "id,name,code,organisationUnits[id,name,code],categoryCombo[categories[id,name,code,categoryOptions[id,name,code]],categoryOptionCombos[code,name,id,categoryOptions[id,name,code]]],dataSetElements[dataElement[id,name,code,categoryCombo[categories[id,name,code,categoryOptions[id,name,code]],categoryOptionCombos[code,name,id,categoryOptions[id,name,code]]]]]",
+                fields: "id,name,code,periodType,organisationUnits[id,name,code],categoryCombo[categories[id,name,code,categoryOptions[id,name,code]],categoryOptionCombos[code,name,id,categoryOptions[id,name,code]]],dataSetElements[dataElement[id,name,code,categoryCombo[categories[id,name,code,categoryOptions[id,name,code]],categoryOptionCombos[code,name,id,categoryOptions[id,name,code]]]]]",
             });
             const attribution = hasAttribution(dataSet);
             mappingApi.update({
@@ -61,6 +61,14 @@ export default function DataSetSelect() {
                 path: "dataSet",
                 value: id,
             });
+
+            if (!mapping.isSource) {
+                mappingApi.update({
+                    attribute: "aggregate",
+                    path: "periodType",
+                    value: dataSet.periodType,
+                });
+            }
             dataSetApi.set(dataSet);
             onClose();
             stepper.next();

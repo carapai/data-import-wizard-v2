@@ -62,18 +62,6 @@ export default function Configuration() {
             ),
         },
         {
-            id: "ou-column",
-            element: (
-                <SelectField
-                    title="Organisation column"
-                    attribute="orgUnitColumn"
-                    options={metadata.sourceColumns}
-                    multiple={false}
-                    key="ou-column"
-                />
-            ),
-        },
-        {
             id: "data-element-column",
             element: (
                 <SelectField

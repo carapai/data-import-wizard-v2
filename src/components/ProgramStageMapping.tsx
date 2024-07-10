@@ -62,7 +62,7 @@ export default function ProgramStageMapping({
 
     const stageMapping: Mapping = programStageMapping[psId] ?? { info: {} };
 
-    const { info, ...rest } = stageMapping;
+    const { info = {}, ...rest } = stageMapping;
     const {
         createEvents = false,
         updateEvents = false,
@@ -327,6 +327,7 @@ export default function ProgramStageMapping({
                                         value: code,
                                     })
                                 )}
+                                disabled={value === ""}
                                 mapping={programStageMapping[psId]}
                             />
                         );
@@ -502,7 +503,7 @@ export default function ProgramStageMapping({
             </Stack>
             <Stack direction="row" spacing="20px" alignItems="center">
                 {mapping.dataSource === "dhis2-program" && (
-                    <Stack flex={1}>
+                    <Stack flex={1} h="100%">
                         <Text>Specific Stage</Text>
                         <Box flex={1}>
                             <Select<Option, false, GroupBase<Option>>

@@ -120,8 +120,8 @@ const Aggregate = () => {
             id: 7,
         },
         {
-            label: "Options",
-            content: <ImportExportOptions />,
+            label: "Import/Export Options",
+            content: <ImportExportOptions showFileUpload={false} />,
             lastLabel: "",
             nextLabel: "Next Step",
             id: 8,

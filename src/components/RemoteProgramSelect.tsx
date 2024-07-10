@@ -20,7 +20,12 @@ export default function RemoteProgramSelect() {
     const engine = useDataEngine();
     const { isOpen, onOpen, onClose } = useDisclosure();
     const programMapping = useStore($mapping);
-    const columns: ColumnsType<IProgram> = [
+    const columns: ColumnsType<Partial<IProgram>> = [
+        {
+            title: "Id",
+            dataIndex: "id",
+            key: "id",
+        },
         {
             title: "Name",
             dataIndex: "name",
@@ -44,7 +49,7 @@ export default function RemoteProgramSelect() {
         q: "",
         fields: "id,name,displayName,lastUpdated,programType",
     });
-    const onProgramSelect = async ({ id }: IProgram) => {
+    const onProgramSelect = async ({ id }: Partial<IProgram>) => {
         onOpen();
         const program = await getDHIS2Resource<IProgram>({
             engine,
@@ -52,7 +57,7 @@ export default function RemoteProgramSelect() {
             resource: `programs/${id}`,
             auth: programMapping.authentication,
             params: {
-                fields: "id,name,trackedEntityType[id,featureType,trackedEntityTypeAttributes[id,trackedEntityAttribute[id,name,code,unique,generated,pattern,confidential,valueType,optionSetValue,displayFormName,optionSet[id,name,options[id,name,code]]]]],programType,featureType,organisationUnits[id,code,name,parent[name,parent[name,parent[name,parent[name,parent[name]]]]]],programStages[id,repeatable,featureType,name,code,programStageDataElements[id,compulsory,name,dataElement[id,name,code,optionSetValue,optionSet[id,name,options[id,name,code]]]]],programTrackedEntityAttributes[id,mandatory,sortOrder,allowFutureDate,trackedEntityAttribute[id,name,code,unique,generated,pattern,confidential,valueType,optionSetValue,displayFormName,optionSet[id,name,options[id,name,code]]]]",
+                fields: "id,name,trackedEntityType[id,featureType,trackedEntityTypeAttributes[id,trackedEntityAttribute[id,name,code,unique,generated,pattern,confidential,valueType,optionSetValue,displayFormName,optionSet[id,name,options[id,name,code]]]]],programType,featureType,organisationUnits[id,code,name,parent[name,parent[name,parent[name,parent[name,parent[name]]]]]],programStages[id,repeatable,featureType,name,code,programStageDataElements[id,compulsory,name,dataElement[id,name,code,valueType,optionSetValue,optionSet[id,name,options[id,name,code]]]]],programTrackedEntityAttributes[id,mandatory,sortOrder,allowFutureDate,trackedEntityAttribute[id,name,code,unique,generated,pattern,confidential,valueType,optionSetValue,displayFormName,optionSet[id,name,options[id,name,code]]]]",
             },
         });
         enrollmentMappingApi.updateMany({
@@ -74,8 +79,6 @@ export default function RemoteProgramSelect() {
             },
         });
         mappingApi.updateMany({
-            orgUnitColumn: "orgUnit",
-            customOrgUnitColumn: false,
             program: {
                 ...programMapping.program,
                 remoteProgram: id,
@@ -99,7 +102,15 @@ export default function RemoteProgramSelect() {
                     {isSuccess && (
                         <Table
                             columns={columns}
-                            dataSource={data.programs}
+                            dataSource={data.programs.map(
+                                (p: Partial<IProgram>) => ({
+                                    ...p,
+                                    programType:
+                                        p.programType === "WITH_REGISTRATION"
+                                            ? "Tracker"
+                                            : "Event",
+                                })
+                            )}
                             rowKey="id"
                             rowSelection={{
                                 type: "radio",

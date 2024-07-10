@@ -230,10 +230,12 @@ export default function EnrollmentMapping() {
             key: "value",
             width: "200px",
             render: (text, { value, optionSetValue, availableOptions }) => {
+                const current = value || "";
                 if (optionSetValue) {
                     return (
                         <OptionSetMapping
-                            value={value ?? ""}
+                            value={current}
+                            disabled={current === ""}
                             destinationOptions={availableOptions || []}
                             mapping={enrollmentMapping}
                         />
@@ -343,14 +345,14 @@ export default function EnrollmentMapping() {
             overflow="auto"
             spacing="25px"
         >
-            <Stack direction="row" spacing="10px">
+            <Stack direction="row" spacing="20px">
                 <InfoMapping
                     customColumn="customEnrollmentIdColumn"
                     value={enrollmentIdColumn}
                     column="enrollmentIdColumn"
                     isChecked={customEnrollmentIdColumn}
                     update={enrollmentMappingApi.update}
-                    title="Enrollment ID"
+                    title="Enrollment ID Column"
                     title2="Custom Enrollment Column"
                 />
 
@@ -360,11 +362,11 @@ export default function EnrollmentMapping() {
                     column="enrollmentDateColumn"
                     isChecked={customEnrollmentDateColumn}
                     update={enrollmentMappingApi.update}
-                    title="Enrollment Date"
+                    title="Enrollment Date Column"
                     title2="Custom Enrollment Date Column"
                 />
                 <MultipleSelect
-                    title={<Text>Geometry</Text>}
+                    title={<Text>Geometry Column</Text>}
                     mapping={programMapping}
                     value="info.geometryColumn"
                     onValueChange={(val) =>

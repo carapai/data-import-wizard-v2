@@ -13,20 +13,23 @@ export default function ImportExportOptions({
     const mapping = useStore($mapping);
     return (
         <Stack spacing="30px">
-            {[
-                "json",
-                "go-data",
-                "csv-line-list",
-                "xlsx-line-list",
-                "xlsx-tabular-data",
-                "xlsx-form",
-            ].indexOf(String(mapping.dataSource)) !== -1 && (
-                <InitialMapping
-                    isSource={mapping.isSource}
-                    dataSource={mapping.dataSource}
-                    extraction={mapping.useColumnLetters ? "column" : undefined}
-                />
-            )}
+            {showFileUpload &&
+                [
+                    "json",
+                    "go-data",
+                    "csv-line-list",
+                    "xlsx-line-list",
+                    "xlsx-tabular-data",
+                    "xlsx-form",
+                ].indexOf(String(mapping.dataSource)) !== -1 && (
+                    <InitialMapping
+                        isSource={mapping.isSource}
+                        dataSource={mapping.dataSource}
+                        extraction={
+                            mapping.useColumnLetters ? "column" : undefined
+                        }
+                    />
+                )}
             {!mapping.isSource && <DHIS2AsDestinationOptions />}
             {(mapping.isSource ||
                 [

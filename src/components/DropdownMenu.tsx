@@ -6,19 +6,13 @@ import {
     MenuButton,
     MenuItem,
     MenuList,
-    Modal,
-    ModalBody,
-    ModalCloseButton,
-    ModalContent,
-    ModalFooter,
-    ModalHeader,
-    ModalOverlay,
     Stack,
     Text,
     useToast,
 } from "@chakra-ui/react";
 import { useDataEngine } from "@dhis2/app-runtime";
 import { useNavigate } from "@tanstack/react-location";
+import { Modal } from "antd";
 import {
     generateUid,
     getGoDataToken,
@@ -206,10 +200,23 @@ export default function DropdownMenu({
     };
 
     const runProgram = async (mapping: Partial<IMapping>) => {
-        if (mapping.prefetch) {
+        if (
+            mapping.dataSource &&
+            [
+                "csv-line-list",
+                "xlsx-line-list",
+                "xlsx-tabular-data",
+                "xlsx-form",
+                "json",
+            ].indexOf(mapping.dataSource) !== -1
+        ) {
             setAction(() => "previewing");
         } else {
-            setAction(() => "uploading");
+            if (mapping.prefetch) {
+                setAction(() => "previewing");
+            } else {
+                setAction(() => "uploading");
+            }
         }
     };
 
@@ -474,6 +481,45 @@ export default function DropdownMenu({
             </Menu>
 
             <Modal
+                title="Basic Modal"
+                open={optionsDialogOpen}
+                onOk={handleOptionsOk}
+                onCancel={handleOptionsCancel}
+                width="60%"
+            >
+                <SwitchComponent condition={action}>
+                    <Case value="previewing">
+                        <DataPreview />
+                    </Case>
+                    <Case value="uploading">
+                        <DataImportSummary />
+                    </Case>
+                    <Case default>
+                        <ImportExportOptions showFileUpload />
+                    </Case>
+                </SwitchComponent>
+            </Modal>
+
+            <Modal
+                title="Basic Modal"
+                open={open}
+                onOk={handleOk}
+                onCancel={handleCancel}
+                width="60%"
+            >
+                <Stack>
+                    <Text>New name</Text>
+                    <Input
+                        value={currentName}
+                        onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                            e.persist();
+                            setCurrentName(() => e.target.value);
+                        }}
+                    />
+                </Stack>
+            </Modal>
+
+            {/* <Modal
                 isOpen={optionsDialogOpen}
                 onClose={() => setOptionsDialogOpen(() => false)}
                 isCentered
@@ -485,19 +531,7 @@ export default function DropdownMenu({
                 <ModalContent>
                     <ModalHeader>Options</ModalHeader>
                     <ModalCloseButton />
-                    <ModalBody>
-                        <SwitchComponent condition={action}>
-                            <Case value="previewing">
-                                <DataPreview />
-                            </Case>
-                            <Case value="uploading">
-                                <DataImportSummary />
-                            </Case>
-                            <Case default>
-                                <ImportExportOptions showFileUpload />
-                            </Case>
-                        </SwitchComponent>
-                    </ModalBody>
+                    <ModalBody></ModalBody>
 
                     <ModalFooter>
                         <Stack
@@ -526,9 +560,9 @@ export default function DropdownMenu({
                         </Stack>
                     </ModalFooter>
                 </ModalContent>
-            </Modal>
+            </Modal> */}
 
-            <Modal
+            {/* <Modal
                 isOpen={open}
                 onClose={() => setOpen(() => false)}
                 isCentered
@@ -538,20 +572,7 @@ export default function DropdownMenu({
                 <ModalContent>
                     <ModalHeader>Set mapping name</ModalHeader>
                     <ModalCloseButton />
-                    <ModalBody>
-                        <Stack>
-                            <Text>New name</Text>
-                            <Input
-                                value={currentName}
-                                onChange={(
-                                    e: ChangeEvent<HTMLInputElement>
-                                ) => {
-                                    e.persist();
-                                    setCurrentName(() => e.target.value);
-                                }}
-                            />
-                        </Stack>
-                    </ModalBody>
+                    <ModalBody></ModalBody>
 
                     <ModalFooter>
                         <Stack
@@ -573,7 +594,7 @@ export default function DropdownMenu({
                         </Stack>
                     </ModalFooter>
                 </ModalContent>
-            </Modal>
+            </Modal> */}
         </>
     );
 }

@@ -24,6 +24,7 @@ import MultipleSelect from "../MultipleSelect";
 import OptionSetMapping from "../OptionSetMapping";
 import Search from "../Search";
 import SourceIcon from "../SourceIcon";
+import InfoMapping from "../InfoMapping";
 
 export default function AttributeMapping() {
     const {
@@ -225,10 +226,12 @@ export default function AttributeMapping() {
             key: "value",
             width: "200px",
             render: (text, { value, optionSetValue, availableOptions }) => {
+                const current = value ?? "";
                 if (optionSetValue) {
                     return (
                         <OptionSetMapping
-                            value={value ?? ""}
+                            value={current}
+                            disabled={current === ""}
                             destinationOptions={availableOptions || []}
                             mapping={attributeMapping}
                         />
@@ -252,63 +255,6 @@ export default function AttributeMapping() {
         },
     ];
 
-    const determineTrackedEntityOptions = () => {
-        if (programMapping.dataSource === "go-data") {
-            return null;
-        }
-
-        return (
-            <Stack spacing="20px" direction="row" alignItems="center">
-                <Text>Tracked Entity Column</Text>
-                <Stack spacing="0">
-                    <Checkbox
-                        isChecked={customTrackedEntityInstanceColumn}
-                        onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                            attributeMappingApi.update({
-                                attribute: "info",
-                                key: "customTrackedEntityInstanceColumn",
-                                value: e.target.checked,
-                            })
-                        }
-                    >
-                        Custom Tracked Entity Column
-                    </Checkbox>
-                    <Box w="500px">
-                        {customTrackedEntityInstanceColumn ? (
-                            <Input
-                                value={trackedEntityInstanceColumn}
-                                onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                                    attributeMappingApi.update({
-                                        attribute: "info",
-                                        key: "trackedEntityInstanceColumn",
-                                        value: e.target.value,
-                                    })
-                                }
-                            />
-                        ) : (
-                            <Select<Option, false, GroupBase<Option>>
-                                value={metadata.sourceColumns.find(
-                                    (val) =>
-                                        val.value ===
-                                        trackedEntityInstanceColumn
-                                )}
-                                options={metadata.sourceColumns}
-                                isClearable
-                                placeholder="Select tracked entity column"
-                                onChange={(e) =>
-                                    attributeMappingApi.update({
-                                        attribute: "info",
-                                        key: "trackedEntityInstanceColumn",
-                                        value: e?.value || "",
-                                    })
-                                }
-                            />
-                        )}
-                    </Box>
-                </Stack>
-            </Stack>
-        );
-    };
     useEffect(() => {
         for (const {
             value: destinationValue,
@@ -396,18 +342,18 @@ export default function AttributeMapping() {
             spacing="25px"
         >
             <Stack direction="row" spacing="20px">
-                {determineTrackedEntityOptions()}
+                <InfoMapping
+                    customColumn="customTrackedEntityInstanceColumn"
+                    value={trackedEntityInstanceColumn}
+                    column="trackedEntityInstanceColumn"
+                    isChecked={customTrackedEntityInstanceColumn}
+                    update={attributeMappingApi.update}
+                    title="Track Entity Column"
+                    title2="Custom Track Entity Column"
+                />
 
                 <MultipleSelect
-                    title={
-                        <Stack>
-                            <Text>Geometry Column </Text>
-                            <Text fontSize="12px">
-                                Latitudes and Longitudes separated? select two
-                                columns beginning with latitude
-                            </Text>
-                        </Stack>
-                    }
+                    title={<Text>Geometry Column </Text>}
                     mapping={attributeMapping}
                     value="info.geometryColumn"
                     onValueChange={(val) =>

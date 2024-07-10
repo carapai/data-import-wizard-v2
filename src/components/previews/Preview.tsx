@@ -164,6 +164,16 @@ export default function Preview() {
                     };
                 }
                 if (
+                    mapping.program.programType === "WITH_REGISTRATION" &&
+                    mapping.dhis2SourceOptions?.trackedEntityInstance
+                ) {
+                    additionalParams = {
+                        ...additionalParams,
+                        trackedEntityInstance:
+                            mapping.dhis2SourceOptions.trackedEntityInstance,
+                    };
+                }
+                if (
                     mapping.dhis2SourceOptions?.programStage &&
                     mapping.dhis2SourceOptions.programStage.length > 0
                 ) {
@@ -171,6 +181,8 @@ export default function Preview() {
                         api: queryApi,
                         programStages: mapping.dhis2SourceOptions.programStage,
                         pageSize: 50,
+                        fetchInstances:
+                            mapping.program.programType === "WITH_REGISTRATION",
                         afterFetch: (data) => {
                             processInstances(
                                 {

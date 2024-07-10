@@ -105,49 +105,49 @@ export default function Mappings() {
         },
     ];
     const actions = [
-        {
-            label: "Users",
-            icon: <Image src="./group.png" alt="users" w="36px" h="36px" />,
-            onClick: () => {
-                actionApi.create();
-                mappingApi.reset({
-                    created: dayjs().format("YYYY-MM-DD HH:mm:ss"),
-                    type: "users",
-                    id: generateUid(),
-                });
-                navigate({ to: "./users" });
-            },
-        },
-        {
-            label: "Metadata",
-            icon: (
-                <Image src="./metadata.png" alt="metadata" w="36px" h="36px" />
-            ),
-            onClick: () => {
-                actionApi.create();
-                mappingApi.reset({
-                    created: dayjs().format("YYYY-MM-DD HH:mm:ss"),
-                    type: "metadata",
-                    id: generateUid(),
-                });
-                navigate({ to: "./metadata" });
-            },
-        },
-        {
-            label: "Organisation Units",
-            icon: (
-                <Image src="./organization.png" alt="ous" w="36px" h="36px" />
-            ),
-            onClick: () => {
-                actionApi.create();
-                mappingApi.reset({
-                    created: dayjs().format("YYYY-MM-DD HH:mm:ss"),
-                    type: "organisation-units",
-                    id: generateUid(),
-                });
-                navigate({ to: "./organisations" });
-            },
-        },
+        // {
+        //     label: "Users",
+        //     icon: <Image src="./group.png" alt="users" w="36px" h="36px" />,
+        //     onClick: () => {
+        //         actionApi.create();
+        //         mappingApi.reset({
+        //             created: dayjs().format("YYYY-MM-DD HH:mm:ss"),
+        //             type: "users",
+        //             id: generateUid(),
+        //         });
+        //         navigate({ to: "./users" });
+        //     },
+        // },
+        // {
+        //     label: "Metadata",
+        //     icon: (
+        //         <Image src="./metadata.png" alt="metadata" w="36px" h="36px" />
+        //     ),
+        //     onClick: () => {
+        //         actionApi.create();
+        //         mappingApi.reset({
+        //             created: dayjs().format("YYYY-MM-DD HH:mm:ss"),
+        //             type: "metadata",
+        //             id: generateUid(),
+        //         });
+        //         navigate({ to: "./metadata" });
+        //     },
+        // },
+        // {
+        //     label: "Organisation Units",
+        //     icon: (
+        //         <Image src="./organization.png" alt="ous" w="36px" h="36px" />
+        //     ),
+        //     onClick: () => {
+        //         actionApi.create();
+        //         mappingApi.reset({
+        //             created: dayjs().format("YYYY-MM-DD HH:mm:ss"),
+        //             type: "organisation-units",
+        //             id: generateUid(),
+        //         });
+        //         navigate({ to: "./organisations" });
+        //     },
+        // },
         {
             label: "Aggregate Data",
             icon: (
