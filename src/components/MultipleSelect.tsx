@@ -24,19 +24,21 @@ export default function MultipleSelect({
             {title}
             <Box flex={1}>
                 <Select<Option, true, GroupBase<Option>>
-                    value={metadata.sourceColumns.filter(
-                        (pt) =>
-                            getOr("", value, mapping)
-                                .split(",")
-                                .indexOf(String(pt.value)) !== -1
-                    )}
+                    value={metadata.sourceColumns.filter((pt) => {
+                        const all = getOr("", value, mapping);
+                        if (all) {
+                            return all.split(",").index(String(pt.value));
+                        }
+                        return false;
+                    })}
                     isMulti
                     options={metadata.sourceColumns}
                     isClearable
                     placeholder={placeholder}
-                    onChange={(e) =>
-                        onValueChange(e.map((x) => x.value ?? "").join(","))
-                    }
+                    onChange={(e) => {
+                        const data = e.map((x) => x.value ?? "");
+                        onValueChange(data.join(","));
+                    }}
                 />
             </Box>
         </Stack>

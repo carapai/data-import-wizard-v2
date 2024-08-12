@@ -12,7 +12,7 @@ export default function ExcelUpload({
     children,
     extraction,
 }: {
-    children?: React.ReactNode;
+    children?: React.ReactElement;
     extraction: Extraction;
 }) {
     const sheets = useStore($sheets);
@@ -24,14 +24,13 @@ export default function ExcelUpload({
             attribute: "sheet",
             value: e?.value,
         });
-
         if (workbook && e && e.value) {
             const actual = generateData(mapping, workbook, e.value, extraction);
-            console.log(actual);
             dataApi.changeData(actual);
         }
     };
 
+    if (mapping.isSource) return null;
     return (
         <Stack spacing="30px" direction="row" alignItems="center">
             <FileUpload type="xlsx" extraction={extraction} />

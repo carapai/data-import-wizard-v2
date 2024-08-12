@@ -1,21 +1,19 @@
-import { Stack, Text, useDisclosure, useToast } from "@chakra-ui/react";
+import { Stack, Text, useDisclosure } from "@chakra-ui/react";
 import { useDataEngine } from "@dhis2/app-runtime";
-import { Badge, TabsProps } from "antd";
-import { Table, Tabs } from "antd";
+import { Badge, Table, Tabs, TabsProps } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { AxiosInstance } from "axios";
 import {
     AggConflict,
     convertToGoData,
-    fetchEvents,
     fetchGoDataData,
     fetchTrackedEntityInstances,
-    flattenTrackedEntityInstances,
     generateUid,
     groupGoData4Insert,
     insertTrackerData,
     insertTrackerData38,
     postRemote,
+    flattenEntitiesByEvents,
     Processed,
     processInstances,
 } from "data-import-wizard-utils";
@@ -157,7 +155,7 @@ export default function ProgramImportSummary() {
                     data.validationReport.errorReports
                 ) {
                     db.dataValueErrors.bulkPut(
-                        data.validationReport.errorReports
+                        data.validationReport.errorReports,
                     );
                 }
                 if (
@@ -166,7 +164,7 @@ export default function ProgramImportSummary() {
                     data.validationReport.warningReports
                 ) {
                     db.dataValueConflicts.bulkPut(
-                        data.validationReport.warningReports
+                        data.validationReport.warningReports,
                     );
                 }
             }
@@ -182,7 +180,7 @@ export default function ProgramImportSummary() {
             deleted: number;
             total: number;
             ignored: number;
-        }
+        },
     ) => {
         await db.trackerResponses.put({
             id: generateUid(),
@@ -288,7 +286,7 @@ export default function ProgramImportSummary() {
                                 <Text>
                                     {
                                         responses.filter(
-                                            (a) => a.completed === "true"
+                                            (a) => a.completed === "true",
                                         ).length
                                     }
                                 </Text>
@@ -313,7 +311,7 @@ export default function ProgramImportSummary() {
                     columns={columns}
                     dataSource={conflicts}
                     rowKey={(r) =>
-                        `${r.errorCode}${r.object}${r.value}${r.property}`
+                        `${r.uid}${r.errorCode}${r.object}${r.value}${r.property}`
                     }
                 />
             ),
@@ -330,7 +328,7 @@ export default function ProgramImportSummary() {
                     columns={columns}
                     dataSource={errors}
                     rowKey={(r) =>
-                        `${r.errorCode}${r.object}${r.value}${r.property}`
+                        `${r.uid}${r.errorCode}${r.object}${r.value}${r.property}`
                     }
                 />
             ),
@@ -339,7 +337,7 @@ export default function ProgramImportSummary() {
 
     const insertData = async (
         api: Partial<{ engine: any; axios: AxiosInstance }>,
-        processedData: Partial<Processed>
+        processedData: Partial<Processed>,
     ) => {
         if (version >= 38) {
             await insertTrackerData38({
@@ -433,45 +431,55 @@ export default function ProgramImportSummary() {
                 queryApi = { axios: remoteAPI };
             }
         }
-        if (mapping.prefetch) {
+
+        if (
+            mapping.prefetch ||
+            [
+                "csv-line-list",
+                "xlsx-line-list",
+                "xlsx-tabular-data",
+                "xlsx-form",
+            ].indexOf(mapping.dataSource ?? "") !== -1
+        ) {
             await insertData(insertApi, processed);
         } else {
-            await fetchTrackedEntityInstances(
-                {
-                    api: queryApi,
-                    program: mapping.program?.remoteProgram,
-                    withAttributes: false,
-                    uniqueAttributeValues: [],
-                    additionalParams,
-                    trackedEntityInstances: [],
-                },
-                async (trackedEntityInstances, { pager }) => {
-                    setMessage(
-                        () =>
-                            `Finished fetching page ${pager?.page} of ${pager?.pageCount} from source`
-                    );
-                    await processInstances(
-                        {
-                            engine,
-                            trackedEntityInstances,
-                            mapping,
-                            version,
-                            attributeMapping,
-                            program,
-                            programStageMapping,
-                            optionMapping,
-                            organisationUnitMapping,
-                            programStageUniqueElements,
-                            programUniqAttributes,
-                            enrollmentMapping,
-                            setMessage,
-                        },
-                        async (data) => {
-                            await insertData(insertApi, data);
-                        }
-                    );
-                }
-            );
+            // await fetchTrackedEntityInstances(
+            //     {
+            //         api: queryApi,
+            //         program: mapping.program?.remoteProgram,
+            //         withAttributes: false,
+            //         uniqueAttributeValues: [],
+            //         additionalParams,
+            //         trackedEntityInstances: [],
+            //     },
+            //     async ({ trackedEntityInstances, pager }) => {
+            //         setMessage(
+            //             () =>
+            //                 `Finished fetching page ${pager?.page} of ${pager?.pageCount} from source`,
+            //         );
+            //         await processInstances(
+            //             {
+            //                 engine,
+            //                 trackedEntityInstances:
+            //                     trackedEntityInstances ?? [],
+            //                 mapping,
+            //                 version,
+            //                 attributeMapping,
+            //                 program,
+            //                 programStageMapping,
+            //                 optionMapping,
+            //                 organisationUnitMapping,
+            //                 programStageUniqueElements,
+            //                 programUniqAttributes,
+            //                 enrollmentMapping,
+            //                 setMessage,
+            //             },
+            //             async (data) => {
+            //                 await insertData(insertApi, data);
+            //             },
+            //         );
+            //     },
+            // );
         }
     };
 
@@ -488,7 +496,7 @@ export default function ProgramImportSummary() {
                         mapping.authentication,
                         "",
                         payload,
-                        {}
+                        {},
                     );
                 }
             } else {
@@ -501,9 +509,10 @@ export default function ProgramImportSummary() {
                         withAttributes: false,
                         trackedEntityInstances: [],
                     },
-                    async (trackedEntityInstances, page) => {
+                    async ({ trackedEntityInstances, pager }) => {
                         setMessage(
-                            () => `Working on page ${page} for tracked entities`
+                            () =>
+                                `Working on page ${pager?.page} for tracked entities`,
                         );
                         // const actual = await convertFromDHIS2(
                         //     flattenTrackedEntityInstances(
@@ -537,7 +546,7 @@ export default function ProgramImportSummary() {
                         //         });
                         //     }
                         // }
-                    }
+                    },
                 );
             }
         } else if (mapping.isSource && mapping.dataSource === "go-data") {
@@ -564,13 +573,13 @@ export default function ProgramImportSummary() {
                         setMessage,
                         setInserted,
                         setUpdates,
-                        setErrored
+                        setErrored,
                     );
                 }
             } else {
                 const { metadata, prev } = await fetchGoDataData(
                     goData,
-                    mapping.authentication || {}
+                    mapping.authentication || {},
                 );
                 await fetchTrackedEntityInstances(
                     {
@@ -581,24 +590,22 @@ export default function ProgramImportSummary() {
                         withAttributes: false,
                         trackedEntityInstances: [],
                     },
-                    async (trackedEntityInstances, page) => {
+                    async ({ trackedEntityInstances, pager }) => {
                         setMessage(
-                            () => `Working on page ${page} for tracked entities`
+                            () =>
+                                `Working on page ${pager?.page} for tracked entities`,
                         );
                         const { processed, errors, conflicts } =
                             convertToGoData(
-                                flattenTrackedEntityInstances(
-                                    {
-                                        trackedEntityInstances,
-                                    },
-                                    "ALL"
+                                flattenEntitiesByEvents(
+                                    trackedEntityInstances ?? [],
                                 ),
                                 organisationUnitMapping,
                                 attributeMapping,
                                 goData,
                                 optionMapping,
                                 tokens,
-                                metadata
+                                metadata,
                             );
                         const { inserts, updates } = processed;
                         await groupGoData4Insert(
@@ -610,16 +617,18 @@ export default function ProgramImportSummary() {
                             setMessage,
                             setInserted,
                             setUpdates,
-                            setErrored
+                            setErrored,
                         );
-                    }
+                    },
                 );
             }
         } else if (mapping.dataSource === "dhis2-program") {
             await processProgram();
         } else if (mapping.dataSource === "go-data" && !mapping.prefetch) {
         } else {
+            onOpen();
             await insertData({ engine }, processed);
+            onClose();
         }
         onClose();
     };

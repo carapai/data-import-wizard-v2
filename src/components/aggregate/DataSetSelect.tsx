@@ -107,10 +107,7 @@ export default function DataSetSelect() {
 
     useEffect(() => {
         loadMetadata();
-        return () => {
-            indicatorApi.reset();
-            programIndicatorApi.reset();
-        };
+        return () => {};
     }, []);
 
     return (

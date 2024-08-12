@@ -57,7 +57,7 @@ const AddableValues = ({
                                 <Input
                                     value={param}
                                     onChange={(
-                                        e: ChangeEvent<HTMLInputElement>
+                                        e: ChangeEvent<HTMLInputElement>,
                                     ) =>
                                         mappingApi.update({
                                             attribute: accessor,
@@ -72,7 +72,7 @@ const AddableValues = ({
                                 <Input
                                     value={value}
                                     onChange={(
-                                        e: ChangeEvent<HTMLInputElement>
+                                        e: ChangeEvent<HTMLInputElement>,
                                     ) =>
                                         mappingApi.update({
                                             attribute: accessor,
@@ -87,7 +87,7 @@ const AddableValues = ({
                                 <Checkbox
                                     isChecked={forUpdates}
                                     onChange={(
-                                        e: ChangeEvent<HTMLInputElement>
+                                        e: ChangeEvent<HTMLInputElement>,
                                     ) =>
                                         mappingApi.update({
                                             attribute: accessor,
@@ -110,7 +110,7 @@ const AddableValues = ({
                                         } = getOr(
                                             {},
                                             `${String(accessor)}.${attribute}`,
-                                            mapping
+                                            mapping,
                                         );
                                         mappingApi.update({
                                             attribute: accessor,
@@ -121,7 +121,7 @@ const AddableValues = ({
                                 />
                             </Td>
                         </Tr>
-                    )
+                    ),
                 )}
             </Tbody>
             <Tfoot>
@@ -161,30 +161,6 @@ export default function APICredentials({
     accessor: keyof IMapping;
 }) {
     const mapping = useStore($mapping);
-    const inputRef = useRef<HTMLInputElement>(null);
-    const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files) {
-            let fileReader = new FileReader();
-            const file = e.target.files[0];
-            fileReader.onload = async (e) => {
-                const result = e.target?.result;
-                if (result) {
-                    const metadata: Option = JSON.parse(String(result));
-                    if (isArray(metadata)) {
-                        mappingApi.update({
-                            attribute: "program",
-                            value: metadata,
-                            path: "metadataOptions",
-                            subPath: "metadata",
-                        });
-                    }
-                }
-            };
-            fileReader;
-            fileReader.readAsText(file);
-        }
-    };
-
     return (
         <Stack spacing="20px">
             <Stack direction="row" justifyItems="center" spacing="30px">
@@ -225,7 +201,7 @@ export default function APICredentials({
                                         mapping.authentication?.username ?? ""
                                     }
                                     onChange={(
-                                        e: ChangeEvent<HTMLInputElement>
+                                        e: ChangeEvent<HTMLInputElement>,
                                     ) =>
                                         mappingApi.update({
                                             attribute: "authentication",
@@ -243,7 +219,7 @@ export default function APICredentials({
                                         mapping.authentication?.password ?? ""
                                     }
                                     onChange={(
-                                        e: ChangeEvent<HTMLInputElement>
+                                        e: ChangeEvent<HTMLInputElement>,
                                     ) =>
                                         mappingApi.update({
                                             attribute: "authentication",

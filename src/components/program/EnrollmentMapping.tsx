@@ -35,6 +35,10 @@ export default function EnrollmentMapping() {
             updateEnrollments,
             enrollmentIdColumn,
             customEnrollmentIdColumn,
+            incidentDateColumn,
+            customIncidentDateColumn,
+            customGeometryColumn,
+            geometryColumn,
         } = {
             customEnrollmentDateColumn: false,
             enrollmentDateColumn: "",
@@ -42,6 +46,10 @@ export default function EnrollmentMapping() {
             updateEnrollments: false,
             enrollmentIdColumn: "",
             customEnrollmentIdColumn: false,
+            customIncidentDateColumn: false,
+            incidentDateColumn: "",
+            customGeometryColumn: false,
+            geometryColumn: "",
         },
         ...enrollmentMapping
     } = useStore($enrollmentMapping);
@@ -50,13 +58,13 @@ export default function EnrollmentMapping() {
     const metadata = useStore($metadata);
     const { source, destination } = useStore($names);
     const [attributes, setCurrentAttributes] = useState(
-        metadata.destinationEnrollmentAttributes
+        metadata.destinationEnrollmentAttributes,
     );
 
     const [searchString, setSearchString] = useState<string>("");
 
     const currentMappingValues = Object.values(enrollmentMapping).map(
-        ({ value }) => value
+        ({ value }) => value,
     );
 
     const columns: ColumnsType<Partial<Option>> = [
@@ -191,7 +199,7 @@ export default function EnrollmentMapping() {
                         value={metadata.sourceColumns?.find(
                             (val) =>
                                 val.value ===
-                                enrollmentMapping[value ?? ""]?.value
+                                enrollmentMapping[value ?? ""]?.value,
                         )}
                         options={metadata.sourceColumns}
                         isClearable
@@ -271,7 +279,7 @@ export default function EnrollmentMapping() {
                     ({ value }) =>
                         value &&
                         destinationValue &&
-                        value.includes(destinationValue)
+                        value.includes(destinationValue),
                 );
                 if (search) {
                     enrollmentMappingApi.updateMany({
@@ -287,7 +295,7 @@ export default function EnrollmentMapping() {
                         ({ label }) =>
                             label &&
                             destinationLabel &&
-                            label.includes(destinationLabel)
+                            label.includes(destinationLabel),
                     );
                     if (search2) {
                         enrollmentMappingApi.updateMany({
@@ -352,7 +360,7 @@ export default function EnrollmentMapping() {
                     column="enrollmentIdColumn"
                     isChecked={customEnrollmentIdColumn}
                     update={enrollmentMappingApi.update}
-                    title="Enrollment ID Column"
+                    title="Enrollment Column"
                     title2="Custom Enrollment Column"
                 />
 
@@ -365,20 +373,26 @@ export default function EnrollmentMapping() {
                     title="Enrollment Date Column"
                     title2="Custom Enrollment Date Column"
                 />
-                <MultipleSelect
-                    title={<Text>Geometry Column</Text>}
-                    mapping={programMapping}
-                    value="info.geometryColumn"
-                    onValueChange={(val) =>
-                        enrollmentMappingApi.update({
-                            attribute: "info",
-                            key: "geometryColumn",
-                            value: val,
-                        })
-                    }
+                <InfoMapping
+                    customColumn="customIncidentDateColumn"
+                    value={incidentDateColumn}
+                    column="incidentDateColumn"
+                    isChecked={customIncidentDateColumn}
+                    update={enrollmentMappingApi.update}
+                    title="Incident Date Column"
+                    title2="Custom Incident Column"
+                />
+                <InfoMapping
+                    customColumn="customGeometryColumn"
+                    value={geometryColumn}
+                    column="geometryColumn"
+                    isChecked={customGeometryColumn}
+                    update={enrollmentMappingApi.update}
+                    title="Geometry Column"
+                    title2="Custom Geometry Column"
+                    isMulti
                 />
             </Stack>
-
             <Stack spacing={[1, 5]} direction={["column", "row"]}>
                 <Checkbox
                     colorScheme="green"

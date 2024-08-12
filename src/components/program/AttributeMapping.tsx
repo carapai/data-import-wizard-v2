@@ -31,13 +31,17 @@ export default function AttributeMapping() {
         info: {
             customTrackedEntityInstanceColumn,
             trackedEntityInstanceColumn,
+            customGeometryColumn,
             createEntities,
             updateEntities,
+            geometryColumn,
         } = {
             customTrackedEntityInstanceColumn: false,
+            customGeometryColumn: false,
             trackedEntityInstanceColumn: "",
             createEntities: false,
             updateEntities: false,
+            geometryColumn: "",
         },
         ...attributeMapping
     } = useStore($attributeMapping);
@@ -46,13 +50,13 @@ export default function AttributeMapping() {
     const metadata = useStore($metadata);
     const { source, destination } = useStore($names);
     const [attributes, setCurrentAttributes] = useState(
-        metadata.destinationAttributes
+        metadata.destinationAttributes,
     );
 
     const [searchString, setSearchString] = useState<string>("");
 
     const currentMappingValues = Object.values(attributeMapping).map(
-        ({ value }) => value
+        ({ value }) => value,
     );
 
     const columns: ColumnsType<Partial<Option>> = [
@@ -187,7 +191,7 @@ export default function AttributeMapping() {
                         value={metadata.sourceColumns?.find(
                             (val) =>
                                 val.value ===
-                                attributeMapping[value ?? ""]?.value
+                                attributeMapping[value ?? ""]?.value,
                         )}
                         options={metadata.sourceColumns}
                         isClearable
@@ -267,7 +271,7 @@ export default function AttributeMapping() {
                     ({ value }) =>
                         value &&
                         destinationValue &&
-                        value.includes(destinationValue)
+                        value.includes(destinationValue),
                 );
                 if (search) {
                     attributeMappingApi.updateMany({
@@ -283,7 +287,7 @@ export default function AttributeMapping() {
                         ({ label }) =>
                             label &&
                             destinationLabel &&
-                            label.includes(destinationLabel)
+                            label.includes(destinationLabel),
                     );
                     if (search2) {
                         attributeMappingApi.updateMany({
@@ -351,18 +355,15 @@ export default function AttributeMapping() {
                     title="Track Entity Column"
                     title2="Custom Track Entity Column"
                 />
-
-                <MultipleSelect
-                    title={<Text>Geometry Column </Text>}
-                    mapping={attributeMapping}
-                    value="info.geometryColumn"
-                    onValueChange={(val) =>
-                        attributeMappingApi.update({
-                            attribute: "info",
-                            key: "geometryColumn",
-                            value: val,
-                        })
-                    }
+                <InfoMapping
+                    customColumn="customGeometryColumn"
+                    value={geometryColumn}
+                    column="geometryColumn"
+                    isChecked={customGeometryColumn}
+                    update={attributeMappingApi.update}
+                    title="Geometry Column"
+                    title2="Custom Geometry Column"
+                    isMulti
                 />
             </Stack>
             <Stack spacing={[1, 5]} direction={["column", "row"]}>
@@ -386,7 +387,7 @@ export default function AttributeMapping() {
                     onChange={(e) => {
                         attributeMappingApi.update({
                             attribute: "info",
-                            key: "updateEnrollments",
+                            key: "updateEntities",
                             value: e.target.checked,
                         });
                     }}

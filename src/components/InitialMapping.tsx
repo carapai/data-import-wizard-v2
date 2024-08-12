@@ -1,6 +1,5 @@
 import { DataSource } from "data-import-wizard-utils";
 import APICredentials from "./APICredentials";
-import CSVUpload from "./CSVUpload";
 import FileUpload from "./FileUpload";
 import ExcelUpload from "./mapping-fields/ExcelUpload";
 
@@ -13,18 +12,20 @@ export const InitialMapping = ({
     extraction: "cell" | "column" | "json";
     dataSource: DataSource;
 }>) => {
-    const options = {
+    const options: Record<DataSource, React.ReactElement> = {
         api: <APICredentials accessor="authentication" displayDHIS2Options />,
-        "xlsx-line-list": isSource ? null : (
+        "xlsx-line-list": (
             <ExcelUpload extraction={extraction ? extraction : "json"} />
         ),
-        "csv-line-list": isSource ? null : <CSVUpload />,
-        "xlsx-tabular-data": isSource ? null : (
+        "csv-line-list": (
             <ExcelUpload extraction={extraction ? extraction : "json"} />
         ),
-        "xlsx-form": isSource ? null : <ExcelUpload extraction="cell" />,
-        csv: isSource ? null : <CSVUpload />,
-        json: isSource ? null : <FileUpload type="json" extraction="json" />,
+        "xlsx-tabular-data": (
+            <ExcelUpload extraction={extraction ? extraction : "json"} />
+        ),
+        "xlsx-form": <ExcelUpload extraction="cell" />,
+
+        json: <FileUpload type="json" extraction="json" />,
         "dhis2-data-set": (
             <APICredentials accessor="authentication" displayDHIS2Options />
         ),
@@ -43,6 +44,7 @@ export const InitialMapping = ({
         "go-data": (
             <APICredentials accessor="authentication" displayDHIS2Options />
         ),
+        fhir: <FileUpload type="json" extraction="json" />,
     };
 
     if (dataSource) {

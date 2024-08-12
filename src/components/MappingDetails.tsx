@@ -87,7 +87,7 @@ export default function MappingDetails({
                     <Box flex={1}>
                         <Select<Option, false, GroupBase<Option>>
                             value={importTypes.find(
-                                (pt) => pt.value === mapping.dataSource
+                                (pt) => pt.value === mapping.dataSource,
                             )}
                             onChange={(e) => onSelect(e)}
                             options={importTypes}
@@ -96,7 +96,7 @@ export default function MappingDetails({
                     </Box>
                     {mapping.dataSource &&
                         ["xlsx-line-list", "xlsx-tabular-data"].indexOf(
-                            mapping.dataSource
+                            mapping.dataSource,
                         ) !== -1 &&
                         !mapping.isSource && (
                             <Checkbox
@@ -133,23 +133,97 @@ export default function MappingDetails({
                         )}
                 </Stack>
             </Stack>
+            {!mapping.isCurrentInstance && (
+                <InitialMapping
+                    isSource={mapping.isSource}
+                    dataSource={mapping.dataSource}
+                    extraction={mapping.useColumnLetters ? "column" : "json"}
+                />
+            )}
 
-            <InitialMapping
-                isSource={mapping.isSource}
-                dataSource={
-                    mapping.isCurrentInstance &&
-                    [
-                        "dhis2-data-set",
-                        "dhis2-indicators",
-                        "dhis2-program-indicators",
-                        "manual-dhis2-program-indicators",
-                        "dhis2-program",
-                    ].indexOf(mapping.dataSource ?? "") !== -1
-                        ? undefined
-                        : mapping.dataSource
-                }
-                extraction={mapping.useColumnLetters ? "column" : undefined}
-            />
+            {mapping.type === "individual" && !mapping.isSource && (
+                <Stack spacing="20px">
+                    <Text>Preliminary Options</Text>
+                    <Stack direction="row" spacing="20px">
+                        <Checkbox
+                            isChecked={mapping.program?.createEntities}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                                mappingApi.update({
+                                    attribute: "program",
+                                    path: "createEntities",
+                                    value: e.target.checked,
+                                })
+                            }
+                        >
+                            Create Entities
+                        </Checkbox>
+                        <Checkbox
+                            isChecked={mapping.program?.updateEntities}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                                mappingApi.update({
+                                    attribute: "program",
+                                    path: "updateEntities",
+                                    value: e.target.checked,
+                                })
+                            }
+                        >
+                            Update Entities
+                        </Checkbox>
+                    </Stack>
+                    <Stack direction="row" spacing="20px">
+                        <Checkbox
+                            isChecked={mapping.program?.createEnrollments}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                                mappingApi.update({
+                                    attribute: "program",
+                                    path: "createEnrollments",
+                                    value: e.target.checked,
+                                })
+                            }
+                        >
+                            Create Enrollments
+                        </Checkbox>
+                        <Checkbox
+                            isChecked={mapping.program?.updateEnrollments}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                                mappingApi.update({
+                                    attribute: "program",
+                                    path: "updateEnrollments",
+                                    value: e.target.checked,
+                                })
+                            }
+                        >
+                            Update Enrollments
+                        </Checkbox>
+                    </Stack>
+                    <Stack direction="row" spacing="20px">
+                        <Checkbox
+                            isChecked={mapping.program?.createEvents}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                                mappingApi.update({
+                                    attribute: "program",
+                                    path: "createEvents",
+                                    value: e.target.checked,
+                                })
+                            }
+                        >
+                            Create Events
+                        </Checkbox>
+                        <Checkbox
+                            isChecked={mapping.program?.updateEvents}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                                mappingApi.update({
+                                    attribute: "program",
+                                    path: "updateEvents",
+                                    value: e.target.checked,
+                                })
+                            }
+                        >
+                            Update Events
+                        </Checkbox>
+                    </Stack>
+                </Stack>
+            )}
         </Stack>
     );
 }

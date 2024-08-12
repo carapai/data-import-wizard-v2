@@ -8,11 +8,9 @@ import { useState } from "react";
 import ProgramSelect from "./program/ProgramSelect";
 
 export default function DeleteData() {
-    const { isOpen, onOpen, onClose } = useDisclosure();
-    const [message, setMessage] = useState<string>("");
     const engine = useDataEngine();
     const withoutEnrollment = (
-        trackedEntityInstances: Array<Partial<TrackedEntityInstance>>
+        trackedEntityInstances: Array<Partial<TrackedEntityInstance>>,
     ) => {
         return trackedEntityInstances.flatMap(
             ({ trackedEntityInstance, enrollments }) => {
@@ -20,11 +18,10 @@ export default function DeleteData() {
                     return { trackedEntityInstance };
                 }
                 return [];
-            }
+            },
         );
     };
     const onProgramSelect = async (id?: string) => {
-        onOpen();
         await fetchTrackedEntityInstances(
             {
                 api: { engine },
@@ -35,29 +32,16 @@ export default function DeleteData() {
                 uniqueAttributeValues: [],
                 fields: "trackedEntityInstance",
             },
-            async (tei, { pager }) => {
-                setMessage(
-                    () =>
-                        `Deleting from page ${pager?.page} of ${pager?.pageCount}`
-                );
+            async ({ trackedEntityInstances, pager }) => {
                 const response = await engine.mutate({
                     resource: "trackedEntityInstances",
-                    data: { trackedEntityInstances: tei },
+                    data: { trackedEntityInstances },
                     params: { strategy: "DELETE", async: "true" },
                     type: "create",
                 });
-            }
+            },
         );
-        onClose();
     };
 
-    return (
-        <ProgramSelect
-            isOpen={isOpen}
-            onClose={onClose}
-            onOpen={onOpen}
-            onProgramSelect={onProgramSelect}
-            message={message}
-        />
-    );
+    return <ProgramSelect />;
 }

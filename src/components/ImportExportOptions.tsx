@@ -31,17 +31,14 @@ export default function ImportExportOptions({
                     />
                 )}
             {!mapping.isSource && <DHIS2AsDestinationOptions />}
-            {(mapping.isSource ||
-                [
-                    "dhis2-program",
-                    "dhis2-program-indicators",
-                    "dhis2-data-set",
-                    "dhis2-indicators",
-                    "dhis2-program-indicators",
-                    "manual-dhis2-program-indicators",
-                ].indexOf(String(mapping.dataSource)) !== -1) && (
-                <DHIS2AsSourceOptions />
-            )}
+            {([
+                "dhis2-program",
+                "dhis2-data-set",
+                "dhis2-indicators",
+                "dhis2-program-indicators",
+                "manual-dhis2-program-indicators",
+            ].indexOf(mapping.dataSource ?? "") !== -1 ||
+                mapping.isSource) && <DHIS2AsSourceOptions />}
         </Stack>
     );
 }

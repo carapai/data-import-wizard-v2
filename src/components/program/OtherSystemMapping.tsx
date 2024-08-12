@@ -145,7 +145,7 @@ const Display = ({ data }: { data: Option[] }) => {
                         value={metadata.sourceColumns?.find(
                             (val) =>
                                 val.value ===
-                                attributeMapping[value ?? ""]?.value
+                                attributeMapping[value ?? ""]?.value,
                         )}
                         options={metadata.sourceColumns}
                         isClearable
@@ -161,7 +161,7 @@ const Display = ({ data }: { data: Option[] }) => {
                                                 ?.unique || unique,
                                         valueType,
                                     },
-                                })
+                                }),
                             )
                         }
                     />
@@ -177,6 +177,7 @@ const Display = ({ data }: { data: Option[] }) => {
                     return (
                         <OptionSetMapping
                             value={value ?? ""}
+                            disabled={false}
                             destinationOptions={availableOptions || []}
                             mapping={attributeMapping}
                         />
@@ -189,7 +190,7 @@ const Display = ({ data }: { data: Option[] }) => {
             title: "Mapped",
             width: "100px",
             render: (_, { value }) => {
-                if (isMapped(value, attributeMapping, metadata.sourceColumns)) {
+                if (isMapped(value, attributeMapping)) {
                     return (
                         <Icon as={FiCheck} color="green.400" fontSize="2xl" />
                     );
@@ -246,7 +247,7 @@ const Display = ({ data }: { data: Option[] }) => {
                         Mapped{" "}
                         {
                             Object.values(attributeMapping).filter(
-                                ({ value }) => !!value
+                                ({ value }) => !!value,
                             ).length
                         }{" "}
                         of {data.length}
@@ -305,7 +306,7 @@ export function OtherSystemMapping() {
         } of actualAttributes) {
             if (attributeMapping[destinationValue ?? ""] === undefined) {
                 const search = metadata.sourceColumns.find(
-                    ({ value }) => value === destinationValue
+                    ({ value }) => value === destinationValue,
                 );
                 if (search) {
                     attributeMappingApi.updateMany({
@@ -318,7 +319,7 @@ export function OtherSystemMapping() {
                     });
                 } else {
                     const search2 = metadata.sourceColumns.find(
-                        ({ label }) => label === destinationLabel
+                        ({ label }) => label === destinationLabel,
                     );
                     if (search2) {
                         attributeMappingApi.updateMany({
@@ -345,7 +346,7 @@ export function OtherSystemMapping() {
                             value={entityOptions.find(
                                 (val) =>
                                     val.value ===
-                                    programMapping.program?.responseKey
+                                    programMapping.program?.responseKey,
                             )}
                             options={entityOptions}
                             isClearable

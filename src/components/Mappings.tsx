@@ -12,6 +12,7 @@ import DropdownMenu from "./DropdownMenu";
 import FAB from "./FAB";
 import Loader from "./Loader";
 import Progress from "./Progress";
+import { orderBy } from "lodash";
 
 export default function Mappings() {
     const navigate = useNavigate<LocationGenerics>();
@@ -43,7 +44,7 @@ export default function Mappings() {
     };
 
     useEffect(() => {
-        setCurrentData(() => data);
+        setCurrentData(() => orderBy(data, "lastUpdated", "desc"));
         return () => {};
     }, [data?.length]);
 
@@ -201,6 +202,7 @@ export default function Mappings() {
                     dataSource={currentData}
                     rowKey="id"
                     loading={isLoading}
+                    pagination={{ pageSize: 5 }}
                 />
                 <FAB actions={actions} />
                 <Progress

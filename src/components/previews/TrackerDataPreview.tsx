@@ -21,17 +21,12 @@ import { useMemo } from "react";
 import Superscript from "../Superscript";
 
 import { ColumnsType } from "antd/es/table";
-import { useLiveQuery } from "dexie-react-hooks";
 import { isArray, isObject } from "lodash";
 import { getOr } from "lodash/fp";
-import { db } from "../../db";
 import { $allNames, $processed } from "../../Store";
 export default function TrackerDataPreview() {
     const processed = useStore($processed);
     const allNames = useStore($allNames);
-
-    const errors = useLiveQuery(() => db.dataValueErrors.toArray());
-    const conflicts = useLiveQuery(() => db.dataValueConflicts.toArray());
     const columns: TableColumnsType<Partial<Attribute>> = [
         {
             title: "Data Element ID",
@@ -101,7 +96,7 @@ export default function TrackerDataPreview() {
                 title: "Tracked Entity Type",
             },
         ],
-        []
+        [],
     );
     const enrollmentColumns = useMemo<ColumnsType<Partial<Enrollment>>>(
         () => [
@@ -133,7 +128,7 @@ export default function TrackerDataPreview() {
                 },
             },
         ],
-        []
+        [],
     );
     const eventColumns = useMemo<ColumnsType<Partial<Event>>>(
         () => [
@@ -165,8 +160,13 @@ export default function TrackerDataPreview() {
                 key: "trackedEntityInstance",
                 title: "Tracked Entity Instance",
             },
+            {
+                dataIndex: "enrollment",
+                key: "enrollment",
+                title: "Enrollment",
+            },
         ],
-        []
+        [],
     );
 
     const conflictColumns = useMemo<ColumnsType<any>>(
@@ -176,7 +176,7 @@ export default function TrackerDataPreview() {
                 key: a,
                 render: (_, record) => allNames[record[a]] || record[a],
             })),
-        [Object.keys(processed.conflicts?.[0] ?? {})]
+        [Object.keys(processed.conflicts?.[0] ?? {})],
     );
     const errorColumns = useMemo<ColumnsType<any>>(
         () =>
@@ -187,7 +187,7 @@ export default function TrackerDataPreview() {
                     render: (_, record) => allNames[record[a]] || record[a],
                     key: a,
                 })),
-        [Object.keys(processed.errors?.[0] ?? {})]
+        [Object.keys(processed.errors?.[0] ?? {})],
     );
 
     return (
@@ -207,6 +207,7 @@ export default function TrackerDataPreview() {
                         bg="blue.500"
                     />
                 </Tab>
+
                 <Tab>
                     <Text>New Events</Text>
                     <Superscript
@@ -220,6 +221,13 @@ export default function TrackerDataPreview() {
                         value={
                             processed.trackedEntityInstanceUpdates?.length || 0
                         }
+                        bg="blue.500"
+                    />
+                </Tab>
+                <Tab>
+                    <Text>Enrollment Updates</Text>
+                    <Superscript
+                        value={processed.enrollmentUpdates?.length || 0}
                         bg="blue.500"
                     />
                 </Tab>
@@ -271,6 +279,16 @@ export default function TrackerDataPreview() {
                         columns={enrollmentColumns}
                         dataSource={processed.enrollments}
                         rowKey="enrollment"
+                        expandable={{
+                            expandedRowRender: (record) => (
+                                <Table
+                                    columns={columns}
+                                    dataSource={record.attributes}
+                                    pagination={false}
+                                    rowKey="attribute"
+                                />
+                            ),
+                        }}
                     />
                 </TabPanel>
                 <TabPanel>
@@ -295,6 +313,23 @@ export default function TrackerDataPreview() {
                         columns={instanceColumns}
                         dataSource={processed.trackedEntityInstanceUpdates}
                         rowKey="trackedEntityInstance"
+                        expandable={{
+                            expandedRowRender: (record) => (
+                                <Table
+                                    columns={columns}
+                                    dataSource={record.attributes}
+                                    pagination={false}
+                                    rowKey="attribute"
+                                />
+                            ),
+                        }}
+                    />
+                </TabPanel>
+                <TabPanel>
+                    <Table
+                        columns={enrollmentColumns}
+                        dataSource={processed.enrollmentUpdates}
+                        rowKey="enrollment"
                         expandable={{
                             expandedRowRender: (record) => (
                                 <Table

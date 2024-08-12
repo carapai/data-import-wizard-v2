@@ -7,7 +7,13 @@ import { FiCheck } from "react-icons/fi";
 import Table, { ColumnsType } from "antd/es/table";
 import { ChangeEvent, useEffect, useState } from "react";
 import { attributeMappingApi } from "../../Events";
-import { $attributeMapping, $mapping, $metadata, $names } from "../../Store";
+import {
+    $attributeMapping,
+    $mapping,
+    $metadata,
+    $names,
+    $programIndicators,
+} from "../../Store";
 import DestinationIcon from "../DestinationIcon";
 import Search from "../Search";
 import SourceIcon from "../SourceIcon";
@@ -16,9 +22,11 @@ const DataMapping = () => {
     const attributeMapping = useStore($attributeMapping);
     const mapping = useStore($mapping);
     const metadata = useStore($metadata);
+    const programIndicators = useStore($programIndicators);
+    console.log(programIndicators);
     const { source, destination } = useStore($names);
     const [currentAttributes, setCurrentAttributes] = useState(
-        metadata.destinationColumns
+        metadata.destinationColumns,
     );
     const [searchString, setSearchString] = useState<string>("");
     const setCustom = (attribute: string, manual: boolean) => {
@@ -128,7 +136,7 @@ const DataMapping = () => {
                         value={metadata.sourceColumns?.find(
                             (val) =>
                                 val.value ===
-                                attributeMapping[value ?? ""]?.value
+                                attributeMapping[value ?? ""]?.value,
                         )}
                         options={metadata.sourceColumns}
                         isClearable
@@ -144,7 +152,7 @@ const DataMapping = () => {
                                                 ?.unique || unique,
                                         valueType,
                                     },
-                                })
+                                }),
                             )
                         }
                     />
@@ -175,7 +183,7 @@ const DataMapping = () => {
         } of metadata.destinationColumns) {
             if (attributeMapping[destinationValue ?? ""] === undefined) {
                 const search = metadata.sourceColumns.find(
-                    ({ value }) => value === destinationValue
+                    ({ value }) => value === destinationValue,
                 );
                 if (search) {
                     attributeMappingApi.updateMany({
@@ -188,7 +196,7 @@ const DataMapping = () => {
                     });
                 } else {
                     const search2 = metadata.sourceColumns.find(
-                        ({ label }) => label === destinationLabel
+                        ({ label }) => label === destinationLabel,
                     );
                     if (search2) {
                         attributeMappingApi.updateMany({

@@ -8,13 +8,16 @@ import {
     IDataSet,
     IMapping,
     Mapping,
+    MappingEvent,
     Option,
     StageMapping,
 } from "data-import-wizard-utils";
 import dayjs from "dayjs";
-import { chunk, fromPairs, groupBy, orderBy, uniq } from "lodash";
+import { Workbook as WB } from "exceljs";
+import { chunk, fromPairs, groupBy, orderBy, times, uniq } from "lodash";
 import { uniqBy } from "lodash/fp";
-import { utils, WorkBook } from "xlsx";
+import { Event } from "effector";
+import { read, utils, WorkBook, WorkSheet } from "xlsx";
 import { Column, Threshold } from "../Interfaces";
 import { getDHIS2Resource } from "../Queries";
 
@@ -24,8 +27,8 @@ export function encodeToBinary(str: string): string {
             /%([0-9A-F]{2})/g,
             function (match, p1) {
                 return String.fromCharCode(parseInt(p1, 16));
-            }
-        )
+            },
+        ),
     );
 }
 export function decodeFromBinary(str: string): string {
@@ -34,7 +37,7 @@ export function decodeFromBinary(str: string): string {
             .call(atob(str), function (c) {
                 return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
             })
-            .join("")
+            .join(""),
     );
 }
 
@@ -46,11 +49,76 @@ export const convertDataToURL = (objs: any[]) => {
         .join("&");
 };
 
+export const getSheetData = (
+    workbook: WorkBook,
+    worksheet: string,
+    headerRow: number = 1,
+    dataStartRow: number = 2,
+    extraction: Extraction = "json",
+) => {
+    const ws = workbook.Sheets[worksheet];
+    if (extraction === "cell") {
+        const {
+            ["!cols"]: cols,
+            ["!rows"]: rows,
+            ["!merges"]: merges,
+            ["!protect"]: protect,
+            ["!autofilter"]: autofilter,
+            ["!ref"]: ref,
+            ["!margins"]: margins,
+            ["!type"]: type,
+            ...rest
+        } = ws;
+
+        const all = Object.entries(rest).map(([col, cell]) => {
+            if (cell && cell.t === "d") {
+                return [col, dayjs(cell.v).format("YYYY-MM-DD")];
+            } else if (cell) {
+                return [col, cell.v];
+            } else {
+                return [col, ""];
+            }
+        });
+        return [fromPairs(all)];
+    }
+
+    let range = utils.decode_range(ws["!ref"] ?? "");
+    let dense = ws["!data"] != null;
+    const columns = times(range.e.c + 1, (c) => {
+        let cell = dense
+            ? ws["!data"]?.[headerRow - 1]?.[c]
+            : ws[utils.encode_cell({ r: headerRow - 1, c })];
+        if (cell) return cell.v;
+        return "";
+    });
+    const data = [];
+
+    for (let R = dataStartRow - 1; R <= range.e.r; ++R) {
+        const currentRow: any[][] = [];
+        for (let C = 0; C <= range.e.c; ++C) {
+            let cell = dense
+                ? ws["!data"]?.[R]?.[C]
+                : ws[utils.encode_cell({ r: R, c: C })];
+            const column: string =
+                extraction === "column" ? utils.encode_col(C) : columns[C];
+            if (cell && cell.t === "d") {
+                currentRow.push([column, dayjs(cell.v).format("YYYY-MM-DD")]);
+            } else if (cell) {
+                currentRow.push([column, String(cell.v)]);
+            } else {
+                currentRow.push([column, ""]);
+            }
+        }
+        data.push(fromPairs(currentRow));
+    }
+    return data;
+};
+
 export const generateData = (
     mapping: Partial<IMapping>,
     workbook: WorkBook,
     sheet: string,
-    extraction: Extraction
+    extraction: Extraction,
 ) => {
     const sheetData = workbook.Sheets[sheet];
     if (extraction === "json") {
@@ -68,7 +136,7 @@ export const generateData = (
             return data
                 .slice(mapping.dataStartRow)
                 .map((d) =>
-                    fromPairs(d.map((dx, index) => [header[index], dx]))
+                    fromPairs(d.map((dx, index) => [header[index], dx])),
                 );
         }
         return [];
@@ -109,7 +177,7 @@ export const findColor = (val: number, thresholds: Threshold[]) => {
             return [];
         }),
         ["value"],
-        ["asc"]
+        ["asc"],
     );
     const baseline =
         thresholds.find(({ id }) => id === "baseline")?.color || "";
@@ -133,7 +201,7 @@ const calculation = {
             aggregationColumn: string;
             col2: string;
             prevValue: number;
-        }>
+        }>,
     ) => {
         const value = data.length;
         const color = findColor(value, thresholds);
@@ -148,7 +216,7 @@ const calculation = {
 const findMerged = (
     list: string[],
     data: Array<any>,
-    properties?: { [key: string]: any }
+    properties?: { [key: string]: any },
 ) => {
     if (data) {
         let finalColumns: Array<Array<Column>> = [];
@@ -233,7 +301,7 @@ export const processTable = ({
         const finalRows = findMerged(rows, data, properties);
 
         const groupedData = groupBy(data, (d) =>
-            rows.map((r) => d[r]).join("")
+            rows.map((r) => d[r]).join(""),
         );
 
         const allKeys = Object.keys(groupedData);
@@ -245,12 +313,12 @@ export const processTable = ({
                 rows = uniqBy(aggregationColumn, values);
             }
             const groupedByColumn = groupBy(values, (d) =>
-                columns.map((r) => d[r]).join("")
+                columns.map((r) => d[r]).join(""),
             );
             let currentObj: any = fromPairs(
                 otherColumns
                     .filter((d) => !!d)
-                    .map((d) => [d, uniqBy("id", values).length])
+                    .map((d) => [d, uniqBy("id", values).length]),
             );
 
             Object.entries(groupedByColumn).forEach(
@@ -261,7 +329,7 @@ export const processTable = ({
                         {
                             aggregationColumn,
                             prevValue: rows.length,
-                        }
+                        },
                     );
                     currentObj = {
                         ...currentObj,
@@ -271,7 +339,7 @@ export const processTable = ({
                         ...columnData[0],
                         key,
                     };
-                }
+                },
             );
             return currentObj;
         });
@@ -313,7 +381,7 @@ export function invertHex(hex: string, bw: boolean = true) {
 
 export function columnTree(
     list: Array<ColumnsType<any>>,
-    properties: { [key: string]: any }
+    properties: { [key: string]: any },
 ): Array<ColumnsType<any>> {
     if (list.length === 0) {
         return [];
@@ -364,7 +432,7 @@ export function columnTree(
                                             backgroundColor: cell[`${a.key}bg`],
                                             color: invertHex(
                                                 cell[`${a.key}bg`],
-                                                true
+                                                true,
                                             ),
                                         },
                                     };
@@ -374,7 +442,7 @@ export function columnTree(
                     };
                 }),
             ],
-            properties
+            properties,
         );
     } else {
         return columnTree(
@@ -382,7 +450,7 @@ export function columnTree(
                 ...list.slice(0, list.length - 2),
                 ...columnTree(list.slice(-2), properties),
             ],
-            properties
+            properties,
         );
     }
 }
@@ -528,7 +596,7 @@ export const processAggregateData = async ({
                 dataMapping,
                 data,
                 attributionMapping,
-            })
+            }),
         );
     } else if (mapping.dataSource === "dhis2-data-set") {
         for (const orgUnit of mapping.dhis2SourceOptions?.ous ?? []) {
@@ -547,7 +615,7 @@ export const processAggregateData = async ({
                 }
                 setMessage(
                     () =>
-                        `Querying data orgUnit ${orgUnit} and period ${p.value}`
+                        `Querying data orgUnit ${orgUnit} and period ${p.value}`,
                 );
                 const data = await getDHIS2Resource<any>({
                     isCurrentDHIS2: mapping.isCurrentInstance,
@@ -560,7 +628,7 @@ export const processAggregateData = async ({
                 if (data.dataValues) {
                     setMessage(
                         () =>
-                            `Converting data for orgUnit ${orgUnit} and period ${p.value}`
+                            `Converting data for orgUnit ${orgUnit} and period ${p.value}`,
                     );
                     await dataCallback(
                         convertToAggregate({
@@ -569,14 +637,14 @@ export const processAggregateData = async ({
                             dataMapping,
                             data: data.dataValues,
                             attributionMapping,
-                        })
+                        }),
                     );
                 }
             }
         }
     } else if (
         ["dhis2-indicators", "dhis2-program-indicators"].indexOf(
-            mapping.dataSource ?? ""
+            mapping.dataSource ?? "",
         ) !== -1
     ) {
         const allKeys = Object.values(dataMapping).flatMap((a) => {
@@ -594,9 +662,9 @@ export const processAggregateData = async ({
                             mapping.aggregate?.indicatorGenerationLevel
                         } and periods ${(
                             mapping.dhis2SourceOptions?.period?.map(
-                                (p) => p.value
+                                (p) => p.value,
                             ) ?? []
-                        ).join(";")} for indicators ${indicators.join(";")}`
+                        ).join(";")} for indicators ${indicators.join(";")}`,
                 );
                 const data = await getDHIS2Resource<{
                     headers: Array<{ name: string }>;
@@ -606,12 +674,12 @@ export const processAggregateData = async ({
                     auth: mapping.authentication,
                     engine,
                     resource: `analytics.json?dimension=dx:${indicators.join(
-                        ";"
+                        ";",
                     )}&dimension=ou:LEVEL-${
                         mapping.aggregate?.indicatorGenerationLevel ?? []
                     }&dimension=pe:${(
                         mapping.dhis2SourceOptions?.period?.map(
-                            (p) => p.value
+                            (p) => p.value,
                         ) ?? []
                     ).join(";")}`,
                 });
@@ -622,9 +690,9 @@ export const processAggregateData = async ({
                             mapping.aggregate?.indicatorGenerationLevel
                         } and periods ${(
                             mapping.dhis2SourceOptions?.period?.map(
-                                (p) => p.value
+                                (p) => p.value,
                             ) ?? []
-                        ).join(";")} for indicators ${indicators.join(";")}`
+                        ).join(";")} for indicators ${indicators.join(";")}`,
                 );
                 if (data.rows && data.rows.length > 0) {
                     const finalData = data.rows.map((row) =>
@@ -632,8 +700,8 @@ export const processAggregateData = async ({
                             row.map((r, index) => [
                                 data.headers?.[index].name,
                                 r,
-                            ])
-                        )
+                            ]),
+                        ),
                     );
                     dataCallback(
                         convertToAggregate({
@@ -642,7 +710,7 @@ export const processAggregateData = async ({
                             dataMapping,
                             data: finalData,
                             attributionMapping,
-                        })
+                        }),
                     );
                 }
             }
@@ -684,7 +752,7 @@ export const aggregateDataColumns: ColumnsType<AggDataValue> = [
 ];
 
 export const invalidDataColumns = (
-    invalidData: any[] | undefined
+    invalidData: any[] | undefined,
 ): ColumnsType<any> => {
     if (invalidData && invalidData.length > 0) {
         const keys = Object.keys(invalidData[0]);
@@ -701,17 +769,19 @@ export const invalidDataColumns = (
 
 export const hasAttribution = (dataSet: Partial<IDataSet>) => {
     const categories = dataSet.categoryCombo?.categories.filter(
-        ({ name }) => name !== "default"
+        ({ name }) => name !== "default",
     );
     return categories && categories.length > 0;
 };
 
 export const findUniqueDataSetCompletions = (
     dataSet: string,
-    values: AggDataValue[]
+    values: AggDataValue[],
 ) => {
     return uniq(values.map((x) => `${x.orgUnit},${x.period}`)).map((a) => {
         const [organisationUnit, period] = a.split(",");
         return { organisationUnit, period, completed: true, dataSet };
     });
 };
+
+export const processProgramMapping = () => {};

@@ -37,7 +37,6 @@ import { saveProgramMapping } from "../utils/utils";
 import ImportExportOptions from "./ImportExportOptions";
 import MappingDetails from "./MappingDetails";
 import OrganisationUnitMapping from "./OrganisationUnitMapping";
-import Preview from "./previews/Preview";
 import AttributeMapping from "./program/AttributeMapping";
 import EnrollmentMapping from "./program/EnrollmentMapping";
 import EventMapping from "./program/EventMapping";
@@ -48,6 +47,7 @@ import RemoteOutbreaks from "./RemoteOutbreak";
 import RemoteProgramSelect from "./RemoteProgramSelect";
 import StepperButtons from "./StepperButtons";
 import StepsDisplay from "./StepsDisplay";
+import DataPreview from "./DataPreview";
 
 const importTypes: Option[] = [
     { value: "dhis2-program", label: "dhis2-program" },
@@ -56,6 +56,7 @@ const importTypes: Option[] = [
     { value: "go-data", label: "go-data" },
     { value: "csv-line-list", label: "csv-line-list" },
     { value: "xlsx-line-list", label: "xlsx-line-list" },
+    { value: "fhir", label: "fhir" },
 ];
 
 const Program = () => {
@@ -148,7 +149,7 @@ const Program = () => {
         },
         {
             label: "Import Preview",
-            content: <Preview />,
+            content: <DataPreview />,
             nextLabel: "Import",
             id: 12,
             lastLabel: "Go to Mappings",
@@ -184,7 +185,7 @@ const Program = () => {
                     } else {
                         return (
                             [1, 2, 3, 5, 7, 8, 13, 15, ...preview].indexOf(
-                                id
+                                id,
                             ) !== -1
                         );
                     }
@@ -192,7 +193,7 @@ const Program = () => {
                 if (
                     programMapping.dataSource &&
                     ["json", "csv-line-list", "xlsx-line-list"].indexOf(
-                        programMapping.dataSource
+                        programMapping.dataSource,
                     ) !== -1
                 ) {
                     return [2, 3, 11, ...preview].indexOf(id) !== -1;
@@ -201,27 +202,19 @@ const Program = () => {
             }
 
             if (programMapping.dataSource === "dhis2-program") {
-                const remove =
-                    programMapping.program?.programType ===
-                    "WITHOUT_REGISTRATION"
-                        ? [9, 15]
-                        : [];
+                const remove = !programMapping.program?.isTracker
+                    ? [9, 15]
+                    : [];
 
                 return [5, 8, ...remove, ...noPreview].indexOf(id) === -1;
             }
             if (programMapping.dataSource === "go-data") {
-                if (
-                    programMapping.program?.programType ===
-                    "WITHOUT_REGISTRATION"
-                ) {
+                if (!programMapping.program?.isTracker) {
                     return [6, 8, 9, 11, 15].indexOf(id) === -1;
                 }
                 return [6, 8, 11].indexOf(id) === -1;
             }
-            const include =
-                programMapping.program?.programType === "WITHOUT_REGISTRATION"
-                    ? []
-                    : [9, 15];
+            const include = !programMapping.program?.isTracker ? [] : [9, 15];
 
             return [1, 2, 3, 7, 10, 11, 12, 13, ...include].indexOf(id) !== -1;
         });
@@ -268,7 +261,7 @@ const Program = () => {
             programMapping.isSource &&
             programMapping.dataSource &&
             ["json", "csv-line-list", "xlsx-line-list"].indexOf(
-                programMapping.dataSource
+                programMapping.dataSource,
             ) !== -1
         ) {
             console.log("We have finished");

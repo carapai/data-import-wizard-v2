@@ -14,16 +14,16 @@ import {
     makeMetadata,
     makeRemoteApi,
     makeValidation,
-    mandatoryAttributes,
+    getMandatoryAttributes,
     Mapping,
     Option,
     OtherProcessed,
     Period,
     Processed,
-    programStageUniqColumns,
-    programStageUniqElements,
-    programUniqAttributes,
-    programUniqColumns,
+    getProgramStageUniqColumns,
+    getProgramStageUniqElements,
+    getProgramUniqAttributes,
+    getProgramUniqColumns,
     StageMapping,
     Step,
 } from "data-import-wizard-utils";
@@ -176,29 +176,29 @@ export const $processedGoDataData = domain.createStore<
 >({});
 
 export const $programStageUniqueElements = $programStageMapping.map(
-    (programStageMapping) => programStageUniqElements(programStageMapping)
+    (programStageMapping) => getProgramStageUniqElements(programStageMapping),
 );
 
 export const $programStageUniqueColumns = $programStageMapping.map(
-    (programStageMapping) => programStageUniqColumns(programStageMapping)
+    (programStageMapping) => getProgramStageUniqColumns(programStageMapping),
 );
 
 export const $programUniqAttributes = $attributeMapping.map(
-    (attributeMapping) => programUniqAttributes(attributeMapping)
+    (attributeMapping) => getProgramUniqAttributes(attributeMapping),
 );
 
 export const $mandatoryAttribute = $attributeMapping.map((attributeMapping) =>
-    mandatoryAttributes(attributeMapping)
+    getMandatoryAttributes(attributeMapping),
 );
 
 export const $programUniqColumns = $attributeMapping.map((attributeMapping) =>
-    programUniqColumns(attributeMapping)
+    getProgramUniqColumns(attributeMapping),
 );
 
 export const $canDHIS2 = $mapping.map((state) => canQueryDHIS2(state));
 
 export const $remoteAPI = $mapping.map((state) =>
-    makeRemoteApi(state.authentication)
+    makeRemoteApi(state.authentication),
 );
 export const $remoteOrganisationApi = $mapping.map((state) => {
     const axiosApi = makeRemoteApi(state.orgUnitApiAuthentication);
@@ -206,7 +206,7 @@ export const $remoteOrganisationApi = $mapping.map((state) => {
 });
 
 export const $metadataAuthApi = $mapping.map((state) =>
-    makeRemoteApi(state.program?.metadataApiAuthentication)
+    makeRemoteApi(state.program?.metadataApiAuthentication),
 );
 export const $dhis2Program = domain.createStore<Partial<IProgram>>({});
 
@@ -280,7 +280,7 @@ export const $metadata = combine(
             enrollmentMapping,
             organisationUnitMapping,
         });
-    }
+    },
 );
 
 export const $disabled = combine(
@@ -324,7 +324,7 @@ export const $disabled = combine(
             hasError,
             enrollmentMapping,
         });
-    }
+    },
 );
 export const $flattenedProgram = $program.map((state) => {
     if (!isEmpty(state)) {
@@ -345,7 +345,7 @@ export const $flattenedProgramKeys = $mapping.map((state) => {
                     value: column,
                 };
                 return option;
-            }
+            },
         );
     }
     return [];
@@ -364,7 +364,7 @@ export const $names = combine(
         dataSet,
         goData,
         destinationProgram,
-        destinationDataSet
+        destinationDataSet,
     ) => {
         let result: { source: string; destination: string } = {
             source: String(mapping.dataSource ?? "")
@@ -404,7 +404,7 @@ export const $names = combine(
             }
         }
         return result;
-    }
+    },
 );
 
 export const $name = $mapping.map((state) => {
@@ -417,7 +417,7 @@ export const $allNames = $program.map((state) => {
     state.programTrackedEntityAttributes?.forEach(
         ({ trackedEntityAttribute: { id, name } }) => {
             names[id] = name;
-        }
+        },
     );
     state.programStages?.forEach(({ programStageDataElements, id, name }) => {
         names[id] = name;

@@ -1,75 +1,4 @@
-import { Stack, useDisclosure } from "@chakra-ui/react";
-import { useDataEngine } from "@dhis2/app-runtime";
-import { AxiosInstance } from "axios";
-import {
-    convertToDHIS2,
-    convertToGoData,
-    fetchEvents,
-    fetchGoDataData,
-    fetchRemote,
-    fetchTrackedEntityInstances,
-    findUniqAttributes,
-    flattenTrackedEntityInstances,
-    GODataTokenGenerationResponse,
-    postRemote,
-    processPreviousInstances,
-    TrackedEntityInstance,
-    processInstances,
-} from "data-import-wizard-utils";
-import { useStore } from "effector-react";
-import { chunk, maxBy, uniqBy } from "lodash";
-import { useEffect, useState } from "react";
-import {
-    $attributeMapping,
-    $data,
-    $goData,
-    $mapping,
-    $metadata,
-    $optionMapping,
-    $organisationUnitMapping,
-    $program,
-    $programStageMapping,
-    $programStageUniqueElements,
-    $programUniqAttributes,
-    $remoteAPI,
-    $tokens,
-    $enrollmentMapping,
-} from "../../Store";
-
-import {
-    otherProcessedApi,
-    prevGoDataApi,
-    processedGoDataDataApi,
-    processor,
-} from "../../Events";
-import { $version } from "../../Store";
-import GoDataPreview from "../GoDataPreview";
-import Progress from "../Progress";
-import OtherSystemPreview from "./OtherSystemPreview";
-import DHIS2Preview from "./TrackerDataPreview";
-import { db } from "../../db";
-
-export default function Preview() {
-    const version = useStore($version);
-    const metadata = useStore($metadata);
-    const program = useStore($program);
-    const tokens = useStore($tokens);
-    const engine = useDataEngine();
-    const { isOpen, onOpen, onClose } = useDisclosure();
-    const mapping = useStore($mapping);
-    const programStageMapping = useStore($programStageMapping);
-    const enrollmentMapping = useStore($enrollmentMapping);
-    const organisationUnitMapping = useStore($organisationUnitMapping);
-    const attributeMapping = useStore($attributeMapping);
-    const programUniqAttributes = useStore($programUniqAttributes);
-    const programStageUniqueElements = useStore($programStageUniqueElements);
-    const optionMapping = useStore($optionMapping);
-    const goData = useStore($goData);
-    const data = useStore($data);
-    const [message, setMessage] = useState<string>("");
-    const remoteAPI = useStore($remoteAPI);
-
-    const process = async () => {
+const process = async () => {
         processor.reset();
         processedGoDataDataApi.reset();
         onOpen();
@@ -110,13 +39,13 @@ export default function Preview() {
             const flattened = flattenTrackedEntityInstances(
                 instances,
                 "ALL",
-                Object.keys(programStageMapping)
+                Object.keys(programStageMapping),
             );
 
             if (mapping.dataSource === "go-data") {
                 const { metadata, prev } = await fetchGoDataData(
                     goData,
-                    mapping.authentication || {}
+                    mapping.authentication || {},
                 );
                 const responseData = convertToGoData(
                     flattened,
@@ -125,7 +54,7 @@ export default function Preview() {
                     goData,
                     optionMapping,
                     tokens,
-                    metadata
+                    metadata,
                 );
                 processedGoDataDataApi.set(responseData);
                 prevGoDataApi.set(prev);
@@ -203,19 +132,19 @@ export default function Preview() {
                                 async (data) => {
                                     setMessage(() => "Adding data to preview");
                                     processor.addInstances(
-                                        data.trackedEntityInstances
+                                        data.trackedEntityInstances,
                                     );
                                     processor.addEnrollments(data.enrollments);
                                     processor.addEvents(data.events);
                                     processor.addInstanceUpdated(
-                                        data.trackedEntityInstanceUpdates
+                                        data.trackedEntityInstanceUpdates,
                                     );
                                     processor.addEventUpdates(
-                                        data.eventUpdates
+                                        data.eventUpdates,
                                     );
                                     processor.addErrors(data.errors);
                                     processor.addConflicts(data.conflicts);
-                                }
+                                },
                             );
                         },
                         others: {
@@ -276,25 +205,25 @@ export default function Preview() {
                                 async (data) => {
                                     setMessage(() => "Adding data to preview");
                                     processor.addInstances(
-                                        data.trackedEntityInstances
+                                        data.trackedEntityInstances,
                                     );
                                     processor.addEnrollments(data.enrollments);
                                     processor.addEvents(data.events);
                                     processor.addInstanceUpdated(
-                                        data.trackedEntityInstanceUpdates
+                                        data.trackedEntityInstanceUpdates,
                                     );
                                     processor.addEventUpdates(
-                                        data.eventUpdates
+                                        data.eventUpdates,
                                     );
                                     processor.addErrors(
-                                        uniqBy(data.errors, "id")
+                                        uniqBy(data.errors, "id"),
                                     );
                                     processor.addConflicts(
-                                        uniqBy(data.conflicts, "id")
+                                        uniqBy(data.conflicts, "id"),
                                     );
-                                }
+                                },
                             );
-                        }
+                        },
                     );
                 }
             } else if (mapping.dataSource === "go-data") {
@@ -315,12 +244,12 @@ export default function Preview() {
                         {
                             email: username,
                             password,
-                        }
+                        },
                     );
 
                 if (response) {
                     const token = response.id;
-                    setMessage(() => "Fetching data from go data");
+                    setMessage(() => "Fetching outbreak data");
                     let goDataData = await fetchRemote<any[]>(
                         {
                             ...rest,
@@ -328,8 +257,10 @@ export default function Preview() {
                                 auth: { param: "access_token", value: token },
                             },
                         },
-                        `api/outbreaks/${goData.id}/cases`
+                        `api/outbreaks/${goData.id}/cases`,
                     );
+
+                    setMessage(() => "Fetching lab data");
 
                     const labResults = await fetchRemote<any[]>(
                         {
@@ -338,11 +269,11 @@ export default function Preview() {
                                 auth: { param: "access_token", value: token },
                             },
                         },
-                        `api/outbreaks/${goData.id}/lab-results/aggregate`
+                        `api/outbreaks/${goData.id}/lab-results/aggregate`,
                     );
                     goDataData = goDataData.map((a) => {
                         const allLabResults = labResults.filter(
-                            (b) => b.personId === a.id
+                            (b) => b.personId === a.id,
                         );
                         if (allLabResults.length > 0) {
                             const maxResult = maxBy(allLabResults, "updatedAt");
@@ -382,7 +313,7 @@ export default function Preview() {
                     let i = 0;
                     for (const current of chunkedData) {
                         setMessage(
-                            () => `Processing batch ${++i} of ${chunkLength}`
+                            () => `Processing batch ${++i} of ${chunkLength}`,
                         );
                         await fetchTrackedEntityInstances(
                             {
@@ -391,7 +322,7 @@ export default function Preview() {
                                 additionalParams: {},
                                 uniqueAttributeValues: findUniqAttributes(
                                     current,
-                                    attributeMapping
+                                    attributeMapping,
                                 ),
                                 withAttributes: true,
                                 trackedEntityInstances: [],
@@ -429,12 +360,12 @@ export default function Preview() {
                                 processor.addEnrollments(enrollments);
                                 processor.addEvents(events);
                                 processor.addInstanceUpdated(
-                                    trackedEntityInstanceUpdates
+                                    trackedEntityInstanceUpdates,
                                 );
                                 processor.addEventUpdates(eventUpdates);
                                 processor.addErrors(errors);
                                 processor.addConflicts(conflicts);
-                            }
+                            },
                         );
                     }
                 }
@@ -483,44 +414,15 @@ export default function Preview() {
                         processor.addEnrollments(enrollments);
                         processor.addEvents(events);
                         processor.addInstanceUpdated(
-                            trackedEntityInstanceUpdates
+                            trackedEntityInstanceUpdates,
                         );
                         processor.addEventUpdates(eventUpdates);
                         processor.addErrors(uniqBy(errors, "id"));
                         processor.addConflicts(uniqBy(conflicts, "id"));
-                    }
+                    },
                 );
             }
         }
 
         onClose();
     };
-
-    useEffect(() => {
-        process();
-        return () => {};
-    }, []);
-    return (
-        <Stack
-            h="calc(100vh - 350px)"
-            maxH="calc(100vh - 350px)"
-            overflow="auto"
-        >
-            {mapping.isSource ? (
-                mapping.dataSource === "go-data" ? (
-                    <GoDataPreview />
-                ) : (
-                    <OtherSystemPreview />
-                )
-            ) : (
-                <DHIS2Preview />
-            )}
-            <Progress
-                onClose={onClose}
-                isOpen={isOpen}
-                message={message}
-                onOpen={onOpen}
-            />
-        </Stack>
-    );
-}

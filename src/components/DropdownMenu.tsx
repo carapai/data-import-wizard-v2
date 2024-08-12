@@ -1,5 +1,4 @@
 import {
-    Button,
     IconButton,
     Input,
     Menu,
@@ -24,6 +23,7 @@ import {
 } from "data-import-wizard-utils";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useStore } from "effector-react";
+import { isEmpty } from "lodash";
 import { ChangeEvent, useState } from "react";
 import { BiDotsVerticalRounded } from "react-icons/bi";
 import { db } from "../db";
@@ -111,14 +111,14 @@ export default function DropdownMenu({
     >("configuring");
 
     const responses = useLiveQuery(() =>
-        db.dataValueResponses.where({ completed: "false" }).toArray()
+        db.dataValueResponses.where({ completed: "false" }).toArray(),
     );
 
     const clone = async (id: string) => {
         const previousMappings = await loadPreviousMapping(
             { engine },
             ["iw-mapping"],
-            id
+            id,
         );
         const mapping: Partial<IMapping> = previousMappings["iw-mapping"] ?? {};
         if (mapping.type === "individual") {
@@ -130,7 +130,7 @@ export default function DropdownMenu({
             } = await getPreviousProgramMapping(
                 { engine },
                 mapping,
-                (message: string) => setMessage(() => message)
+                (message: string) => setMessage(() => message),
             );
             const programMapping = {
                 ...mapping,
@@ -226,7 +226,7 @@ export default function DropdownMenu({
         const previousMappings = await loadPreviousMapping(
             { engine },
             ["iw-mapping"],
-            id
+            id,
         );
         const mapping: Partial<IMapping> = previousMappings["iw-mapping"] ?? {};
 
@@ -242,7 +242,7 @@ export default function DropdownMenu({
             } = await getPreviousProgramMapping(
                 { engine },
                 mapping,
-                (message: string) => setMessage(() => message)
+                (message: string) => setMessage(() => message),
             );
             programApi.set(program);
             stageMappingApi.set(programStageMapping);
@@ -252,6 +252,22 @@ export default function DropdownMenu({
             optionMappingApi.set(optionMapping);
             dhis2ProgramApi.set(remoteProgram);
             enrollmentMappingApi.set(enrollmentMapping);
+
+            if (!isEmpty(program)) {
+                mappingApi.update({
+                    attribute: "program",
+                    path: "isTracker",
+                    value: program.registration,
+                });
+            }
+
+            if (!isEmpty(remoteProgram)) {
+                mappingApi.update({
+                    attribute: "program",
+                    path: "remoteIsTracker",
+                    value: remoteProgram.registration,
+                });
+            }
         } else if (mapping.type === "aggregate") {
             const {
                 attributeMapping,
@@ -262,7 +278,7 @@ export default function DropdownMenu({
             } = await getPreviousAggregateMapping(
                 { engine },
                 mapping,
-                (message: string) => setMessage(() => message)
+                (message: string) => setMessage(() => message),
             );
             mappingApi.set(mapping);
             attributeMappingApi.set(attributeMapping);
@@ -297,7 +313,7 @@ export default function DropdownMenu({
         const previousMappings = await loadPreviousMapping(
             { engine },
             ["iw-mapping"],
-            id
+            id,
         );
         const mapping: Partial<IMapping> = previousMappings["iw-mapping"] ?? {};
         if (mapping.type === "individual") {
@@ -312,7 +328,7 @@ export default function DropdownMenu({
             } = await getPreviousProgramMapping(
                 { engine },
                 mapping,
-                (message: string) => setMessage(() => message)
+                (message: string) => setMessage(() => message),
             );
             programApi.set(program);
             stageMappingApi.set(programStageMapping);
@@ -322,6 +338,22 @@ export default function DropdownMenu({
             optionMappingApi.set(optionMapping);
             dhis2ProgramApi.set(remoteProgram);
             enrollmentMappingApi.set(enrollmentMapping);
+
+            if (!isEmpty(program)) {
+                mappingApi.update({
+                    attribute: "program",
+                    path: "isTracker",
+                    value: program.registration,
+                });
+            }
+
+            if (!isEmpty(remoteProgram)) {
+                mappingApi.update({
+                    attribute: "program",
+                    path: "remoteIsTracker",
+                    value: remoteProgram.registration,
+                });
+            }
 
             if (mapping.dataSource === "go-data") {
                 setMessage(() => "Getting Go.Data token");
@@ -346,7 +378,7 @@ export default function DropdownMenu({
                                 ...parentInfo.map(({ name }) => name),
                                 name,
                             ].join("/")}`,
-                        }))
+                        })),
                     );
                     onClose();
                     navigate({ to: "./individual" });
@@ -378,7 +410,7 @@ export default function DropdownMenu({
             } = await getPreviousAggregateMapping(
                 { engine },
                 mapping,
-                (message: string) => setMessage(() => message)
+                (message: string) => setMessage(() => message),
             );
             mappingApi.set(mapping);
             dataSetApi.set(dataSet);
@@ -485,7 +517,7 @@ export default function DropdownMenu({
                 open={optionsDialogOpen}
                 onOk={handleOptionsOk}
                 onCancel={handleOptionsCancel}
-                width="60%"
+                width="75%"
             >
                 <SwitchComponent condition={action}>
                     <Case value="previewing">
@@ -505,7 +537,7 @@ export default function DropdownMenu({
                 open={open}
                 onOk={handleOk}
                 onCancel={handleCancel}
-                width="60%"
+                width="75%"
             >
                 <Stack>
                     <Text>New name</Text>

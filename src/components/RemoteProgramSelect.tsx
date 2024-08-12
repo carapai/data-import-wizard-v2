@@ -57,7 +57,7 @@ export default function RemoteProgramSelect() {
             resource: `programs/${id}`,
             auth: programMapping.authentication,
             params: {
-                fields: "id,name,trackedEntityType[id,featureType,trackedEntityTypeAttributes[id,trackedEntityAttribute[id,name,code,unique,generated,pattern,confidential,valueType,optionSetValue,displayFormName,optionSet[id,name,options[id,name,code]]]]],programType,featureType,organisationUnits[id,code,name,parent[name,parent[name,parent[name,parent[name,parent[name]]]]]],programStages[id,repeatable,featureType,name,code,programStageDataElements[id,compulsory,name,dataElement[id,name,code,valueType,optionSetValue,optionSet[id,name,options[id,name,code]]]]],programTrackedEntityAttributes[id,mandatory,sortOrder,allowFutureDate,trackedEntityAttribute[id,name,code,unique,generated,pattern,confidential,valueType,optionSetValue,displayFormName,optionSet[id,name,options[id,name,code]]]]",
+                fields: "id,name,registration,trackedEntityType[id,featureType,trackedEntityTypeAttributes[id,trackedEntityAttribute[id,name,code,unique,generated,pattern,confidential,valueType,optionSetValue,displayFormName,optionSet[id,name,options[id,name,code]]]]],programType,featureType,organisationUnits[id,code,name,parent[name,parent[name,parent[name,parent[name,parent[name]]]]]],programStages[id,repeatable,featureType,name,code,programStageDataElements[id,compulsory,name,dataElement[id,name,code,valueType,optionSetValue,optionSet[id,name,options[id,name,code]]]]],programTrackedEntityAttributes[id,mandatory,sortOrder,allowFutureDate,trackedEntityAttribute[id,name,code,unique,generated,pattern,confidential,valueType,optionSetValue,displayFormName,optionSet[id,name,options[id,name,code]]]]",
             },
         });
         enrollmentMappingApi.updateMany({
@@ -82,6 +82,7 @@ export default function RemoteProgramSelect() {
             program: {
                 ...programMapping.program,
                 remoteProgram: id,
+                remoteIsTracker: program.registration,
             },
         });
         dhis2ProgramApi.set(program);
@@ -109,7 +110,7 @@ export default function RemoteProgramSelect() {
                                         p.programType === "WITH_REGISTRATION"
                                             ? "Tracker"
                                             : "Event",
-                                })
+                                }),
                             )}
                             rowKey="id"
                             rowSelection={{

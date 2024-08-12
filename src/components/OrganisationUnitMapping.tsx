@@ -60,11 +60,9 @@ export default function OrganisationUnitMapping() {
     const [querying, setQuerying] = useState<string | undefined>(orgUnitColumn);
     const inputRef = useRef<HTMLInputElement>(null);
     const [currentOrganisations, setCurrentOrganisations] = useState(
-        metadata.destinationOrgUnits
+        metadata.destinationOrgUnits,
     );
-
     const [ouSearch, setOuSearch] = useState<string>("");
-
     const columns: ColumnsType<Partial<Option>> = [
         {
             title: (
@@ -106,7 +104,7 @@ export default function OrganisationUnitMapping() {
                 </Stack>
             ),
             key: "source",
-            render: (text, { value, valueType, unique }) => {
+            render: (_, { value }) => {
                 if (
                     getOr(
                         {
@@ -114,7 +112,7 @@ export default function OrganisationUnitMapping() {
                             isCustom: false,
                         },
                         value ?? "",
-                        organisationUnitMapping
+                        organisationUnitMapping,
                     ).isCustom
                 ) {
                     return (
@@ -126,7 +124,7 @@ export default function OrganisationUnitMapping() {
                                         isCustom: false,
                                     },
                                     value ?? "",
-                                    organisationUnitMapping
+                                    organisationUnitMapping,
                                 ).value
                             }
                             onChange={(e: ChangeEvent<HTMLInputElement>) =>
@@ -150,8 +148,8 @@ export default function OrganisationUnitMapping() {
                                         manual: false,
                                     },
                                     value ?? "",
-                                    organisationUnitMapping
-                                ).value
+                                    organisationUnitMapping,
+                                ).value,
                         )}
                         options={metadata.sourceOrgUnits}
                         isClearable
@@ -206,6 +204,18 @@ export default function OrganisationUnitMapping() {
     };
 
     useEffect(() => {
+        if (mapping.dataSource === "dhis2-program") {
+            ouMappingApi.update({
+                attribute: "info",
+                key: "orgUnitColumn",
+                value: "orgUnit",
+            });
+        }
+
+        return () => {};
+    }, []);
+
+    useEffect(() => {
         fetchOrganisationsByLevel();
         return () => {};
     }, []);
@@ -218,7 +228,7 @@ export default function OrganisationUnitMapping() {
         } of metadata.destinationOrgUnits) {
             if (organisationUnitMapping[destinationValue ?? ""] === undefined) {
                 const search = metadata.sourceOrgUnits.find(
-                    ({ value, label }) => destinationValue === value
+                    ({ value, label }) => destinationValue === value,
                 );
                 if (search) {
                     ouMappingApi.update({
@@ -254,15 +264,23 @@ export default function OrganisationUnitMapping() {
             overflow="auto"
         >
             <Stack direction="row" alignItems="center" spacing="30px">
-                <InfoMapping
-                    customColumn="customOrgUnitColumn"
-                    value={orgUnitColumn}
-                    column="orgUnitColumn"
-                    isChecked={customOrgUnitColumn}
-                    update={ouMappingApi.update}
-                    title="Organisation Column"
-                    title2="Custom Organisation Column"
-                />
+                {[
+                    "dhis2-program-indicators",
+                    "dhis2-indicators",
+                    "dhis2-data-set",
+                    "dhis2-program",
+                    "manual-dhis2-program-indicators",
+                ].indexOf(mapping.dataSource ?? "") === -1 && (
+                    <InfoMapping
+                        customColumn="customOrgUnitColumn"
+                        value={orgUnitColumn}
+                        column="orgUnitColumn"
+                        isChecked={customOrgUnitColumn}
+                        update={ouMappingApi.update}
+                        title="Organisation Column"
+                        title2="Custom Organisation Column"
+                    />
+                )}
                 {mapping.dataSource === "api" && (
                     <Stack direction="row" spacing="20px">
                         <Button onClick={() => inputRef.current?.click()}>
@@ -321,7 +339,7 @@ export default function OrganisationUnitMapping() {
                         Mapped{" "}
                         {findMapped(
                             organisationUnitMapping,
-                            metadata.sourceOrgUnits
+                            metadata.sourceOrgUnits,
                         )}{" "}
                         of {metadata.destinationOrgUnits?.length ?? 0}
                     </Text>

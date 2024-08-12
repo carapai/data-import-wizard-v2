@@ -18,7 +18,7 @@ const onProxyRes = (proxyRes) => {
 // proxy middleware options
 const options = {
     // target: "https://ugandaeidsr.org",
-    target: "http://localhost:8080",
+    // target: "http://localhost:8080",
     // target: "https://play.im.dhis2.org/dev",
     // target: "https://academy.demos.dhis2.org/test1",
     // target: "https://emisuganda.org/emis",
@@ -26,8 +26,9 @@ const options = {
     // target: "https://hmis.health.go.ug",
     // target: "https://eidsr.health.go.ug",
     // target: "https://emiseswatini.dev.hispuganda.org/emiseswatini",
-    // target: "https://sd.emis.ac.sz/emis",
+    target: "https://sd.emis.ac.sz/emis",
     // target: "https://ucndw.afro.who.int/dev",
+    // target: "https://play.im.dhis2.org/stable-2-41-0-1",
     onProxyReq,
     onProxyRes,
     changeOrigin: true,
@@ -43,7 +44,7 @@ app.use(
     cors({
         credentials: true,
         origin: ["http://localhost:3000"],
-    })
+    }),
 );
 app.use("/", exampleProxy);
 app.listen(3002);

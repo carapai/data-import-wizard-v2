@@ -15,6 +15,7 @@ export default function InfoMapping({
     value,
     customColumn,
     title2,
+    isMulti,
 }: {
     title: string;
     title2: string;
@@ -23,10 +24,11 @@ export default function InfoMapping({
     column: keyof RealMapping;
     customColumn: keyof RealMapping;
     value: string | undefined | number | string[];
+    isMulti?: boolean;
 }) {
     const metadata = useStore($metadata);
     return (
-        <Stack spacing="20px" direction="row" alignItems="center" flex={1}>
+        <Stack direction="column" flex={1}>
             <Text>{title}</Text>
             <Stack spacing="0" flex={1}>
                 <Checkbox
@@ -53,10 +55,36 @@ export default function InfoMapping({
                                 })
                             }
                         />
+                    ) : isMulti ? (
+                        <Select<Option, true, GroupBase<Option>>
+                            value={metadata.sourceColumns.filter((val) =>
+                                String(value)
+                                    .split(",")
+                                    .includes(val.value ?? ""),
+                            )}
+                            options={metadata.sourceColumns}
+                            isClearable
+                            isMulti
+                            placeholder="Select column"
+                            onChange={(e) => {
+                                update({
+                                    attribute: "info",
+                                    key: column,
+                                    value: e
+                                        .flatMap((a) => {
+                                            if (a) {
+                                                return a.value;
+                                            }
+                                            return [];
+                                        })
+                                        .join(","),
+                                });
+                            }}
+                        />
                     ) : (
                         <Select<Option, false, GroupBase<Option>>
                             value={metadata.sourceColumns.find(
-                                (val) => val.value === value
+                                (val) => val.value === value,
                             )}
                             options={metadata.sourceColumns}
                             isClearable

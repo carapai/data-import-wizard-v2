@@ -116,7 +116,7 @@ export const processedGoDataDataApi = createApi($processedGoDataData, {
             errors: GoResponse;
             conflicts: GoResponse;
             processed: { updates: GoResponse; inserts: GoResponse };
-        }>
+        }>,
     ) => data,
     reset: () => ({}),
 });
@@ -135,7 +135,7 @@ export const otherProcessedApi = createApi($otherProcessed, {
 export const processor = createApi($processed, {
     addInstances: (
         state,
-        trackedEntityInstances: Array<Partial<TrackedEntityInstance>>
+        trackedEntityInstances: Array<Partial<TrackedEntityInstance>>,
     ) => {
         if (state.trackedEntityInstances) {
             return {
@@ -170,7 +170,7 @@ export const processor = createApi($processed, {
 
     addInstanceUpdated: (
         state,
-        trackedEntityInstanceUpdates: Array<Partial<TrackedEntityInstance>>
+        trackedEntityInstanceUpdates: Array<Partial<TrackedEntityInstance>>,
     ) => {
         if (state.trackedEntityInstanceUpdates) {
             return {
@@ -243,7 +243,7 @@ export const stageMappingApi = createApi($programStageMapping, {
     set: (_, value: StageMapping) => value,
     updateMany: (
         state,
-        { stage, update }: { stage: string; update: Mapping }
+        { stage, update }: { stage: string; update: Mapping },
     ) => {
         return { ...state, ...{ [stage]: { ...state[stage], ...update } } };
     },
@@ -259,7 +259,7 @@ export const remoteMappingApi = createApi($remoteMapping, {
         {
             attribute,
             update,
-        }: { attribute: string; update: Partial<RealMapping> }
+        }: { attribute: string; update: Partial<RealMapping> },
     ) => {
         return {
             ...state,
@@ -271,6 +271,7 @@ export const remoteMappingApi = createApi($remoteMapping, {
 
 export const attributeMappingApi = createApi($attributeMapping, {
     update: (state, payload: Update) => {
+        console.log(payload);
         return updateObject(state, payload);
     },
     set: (_, value: Mapping) => value,
@@ -279,7 +280,7 @@ export const attributeMappingApi = createApi($attributeMapping, {
         {
             attribute,
             update,
-        }: { attribute: string; update: Partial<RealMapping> }
+        }: { attribute: string; update: Partial<RealMapping> },
     ) => {
         return {
             ...state,
@@ -298,7 +299,7 @@ export const enrollmentMappingApi = createApi($enrollmentMapping, {
         {
             attribute,
             update,
-        }: { attribute: string; update: Partial<RealMapping> }
+        }: { attribute: string; update: Partial<RealMapping> },
     ) => {
         return {
             ...state,
@@ -370,7 +371,7 @@ export const attributionMappingApi = createApi($attributionMapping, {
         {
             attribute,
             update,
-        }: { attribute: string; update: Partial<RealMapping> }
+        }: { attribute: string; update: Partial<RealMapping> },
     ) => {
         return {
             ...state,
@@ -383,6 +384,6 @@ export const attributionMappingApi = createApi($attributionMapping, {
 export const metadataApi = createApi($metadata, {
     set: (
         state,
-        { key, value }: { value: Option[]; key: keyof AggMetadata }
+        { key, value }: { value: Option[]; key: keyof AggMetadata },
     ) => ({ ...state, [key]: value }),
 });

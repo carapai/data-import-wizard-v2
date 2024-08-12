@@ -17,6 +17,10 @@ export default function DHIS2AsSourceOptions() {
         if (mapping.dataSource === "dhis2-program") {
             return [0, 1];
         }
+
+        if (mapping.isSource) {
+            return [0, 1];
+        }
         return [];
     };
 
@@ -25,6 +29,10 @@ export default function DHIS2AsSourceOptions() {
             return 1;
         }
         if (mapping.dataSource === "dhis2-program") {
+            return 2;
+        }
+
+        if (mapping.isSource) {
             return 2;
         }
 
@@ -106,8 +114,12 @@ export default function DHIS2AsSourceOptions() {
                 />
             </Stack>
 
-            <SwitchComponent condition={mapping.dataSource}>
-                <Case value="dhis2-program">
+            <SwitchComponent
+                condition={
+                    mapping.dataSource === "dhis2-program" || mapping.isSource
+                }
+            >
+                <Case value={true}>
                     <Stack>
                         <Text>Period Applies To</Text>
                         <Stack spacing={5} direction="row">
@@ -148,7 +160,7 @@ export default function DHIS2AsSourceOptions() {
                         </Stack>
                     </Stack>
                 </Case>
-                <Case default>null</Case>
+                <Case default>{null}</Case>
             </SwitchComponent>
             <Stack>
                 <Text>Organisation</Text>
@@ -164,7 +176,7 @@ export default function DHIS2AsSourceOptions() {
                 />
             </Stack>
 
-            {mapping.program?.programType === "WITH_REGISTRATION" && (
+            {mapping.program?.isTracker && (
                 <Stack>
                     <Text>Tracked Entities</Text>
                     <Input
