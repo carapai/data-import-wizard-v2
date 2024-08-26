@@ -3,7 +3,7 @@ import { GroupBase, Select } from "chakra-react-select";
 import { Option, RealMapping } from "data-import-wizard-utils";
 import { useStore } from "effector-react";
 import { ChangeEvent } from "react";
-import { $metadata } from "../../Store";
+import { $mapping, $metadata } from "../../Store";
 import { stageMappingApi } from "../../Events";
 
 export default function ColumnMapping({
@@ -22,22 +22,36 @@ export default function ColumnMapping({
     title: string;
 }) {
     const metadata = useStore($metadata);
+    const mapping = useStore($mapping);
     return (
         <Stack spacing="10px" flex={1}>
             <Text>{title}</Text>
-            <Checkbox
-                isChecked={isCustom}
-                onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                    stageMappingApi.update({
-                        attribute: "info",
-                        stage: psId,
-                        key: customColumn,
-                        value: e.target.checked,
-                    })
-                }
-            >
-                Custom {title}
-            </Checkbox>
+
+            {[
+                "csv-line-list",
+                "xlsx-line-list",
+                "xlsx-tabular-data",
+                "xlsx-form",
+                "dhis2-data-set",
+                "dhis2-indicators",
+                "dhis2-program-indicators",
+                "dhis2-program",
+                "manual-dhis2-program-indicators",
+            ].indexOf(mapping.dataSource ?? "") === -1 ? (
+                <Checkbox
+                    isChecked={isCustom}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                        stageMappingApi.update({
+                            attribute: "info",
+                            stage: psId,
+                            key: customColumn,
+                            value: e.target.checked,
+                        })
+                    }
+                >
+                    Custom {title}
+                </Checkbox>
+            ) : null}
             <Box>
                 {isCustom ? (
                     <Input
@@ -54,7 +68,7 @@ export default function ColumnMapping({
                 ) : (
                     <Select<Option, false, GroupBase<Option>>
                         value={metadata.sourceColumns.find(
-                            (val) => val.value === value
+                            (val) => val.value === value,
                         )}
                         options={metadata.sourceColumns}
                         placeholder="Select event date column"

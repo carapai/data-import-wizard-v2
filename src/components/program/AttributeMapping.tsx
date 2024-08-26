@@ -1,32 +1,32 @@
-import {
-    Box,
-    Checkbox,
-    Icon,
-    Input,
-    Stack,
-    Text,
-    useToast,
-} from "@chakra-ui/react";
+import { Checkbox, Icon, Stack, Text, useDisclosure } from "@chakra-ui/react";
 import { Table } from "antd";
 import { ColumnsType } from "antd/es/table";
-import { GroupBase, Select } from "chakra-react-select";
 import { Option } from "data-import-wizard-utils";
 import { useStore } from "effector-react";
 import { FiCheck } from "react-icons/fi";
 
-import { ChangeEvent, useEffect, useState } from "react";
+import { ChangeEvent, useState } from "react";
 import { attributeMappingApi } from "../../Events";
-import { $attributeMapping, $mapping, $metadata, $names } from "../../Store";
-import { findMapped, isMapped } from "../../utils/utils";
-import CustomColumn from "../CustomColumn";
+import {
+    $attributeMapping,
+    $mapping,
+    $metadata,
+    $names,
+    $program,
+} from "../../Store";
+import { createMapping, findMapped, isMapped } from "../../utils/utils";
 import DestinationIcon from "../DestinationIcon";
-import MultipleSelect from "../MultipleSelect";
+import FieldMapper from "../FieldMapper";
+import InfoMapping from "../InfoMapping";
 import OptionSetMapping from "../OptionSetMapping";
+import Progress from "../Progress";
 import Search from "../Search";
 import SourceIcon from "../SourceIcon";
-import InfoMapping from "../InfoMapping";
 
 export default function AttributeMapping() {
+    const { isOpen, onOpen, onClose } = useDisclosure();
+    const [message, setMessage] = useState<string>("");
+
     const {
         info: {
             customTrackedEntityInstanceColumn,
@@ -46,17 +46,17 @@ export default function AttributeMapping() {
         ...attributeMapping
     } = useStore($attributeMapping);
     const programMapping = useStore($mapping);
-    const toast = useToast();
     const metadata = useStore($metadata);
     const { source, destination } = useStore($names);
+    const program = useStore($program);
     const [attributes, setCurrentAttributes] = useState(
         metadata.destinationAttributes,
     );
 
     const [searchString, setSearchString] = useState<string>("");
 
-    const currentMappingValues = Object.values(attributeMapping).map(
-        ({ value }) => value,
+    const mappedValues = Object.values(attributeMapping).map(
+        ({ value = "" }) => value,
     );
 
     const columns: ColumnsType<Partial<Option>> = [
@@ -148,79 +148,23 @@ export default function AttributeMapping() {
                 </Stack>
             ),
             key: "source",
-            render: (text, { value, valueType, unique }) => {
-                if (attributeMapping[value ?? ""]?.isCustom) {
-                    return (
-                        <CustomColumn
-                            mapping={attributeMapping}
-                            onTypeUpdate={(e) =>
-                                attributeMappingApi.update({
-                                    attribute: `${value}`,
-                                    key: "customType",
-                                    value: e?.value,
-                                })
-                            }
-                            onValueChange={(val) =>
-                                attributeMappingApi.update({
-                                    attribute: `${value}`,
-                                    key: "value",
-                                    value: val,
-                                })
-                            }
-                            value={value ?? ""}
-                        />
-                    );
-                }
-
-                if (attributeMapping[value ?? ""]?.isSpecific) {
-                    return (
-                        <Input
-                            value={attributeMapping[value ?? ""]?.value}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                                attributeMappingApi.update({
-                                    attribute: `${value}`,
-                                    key: "value",
-                                    value: e.target.value,
-                                })
-                            }
-                        />
-                    );
-                }
+            render: (_, { value = "" }) => {
                 return (
-                    <Select<Option, false, GroupBase<Option>>
-                        value={metadata.sourceColumns?.find(
-                            (val) =>
-                                val.value ===
-                                attributeMapping[value ?? ""]?.value,
-                        )}
-                        options={metadata.sourceColumns}
-                        isClearable
-                        size="md"
-                        onChange={(e) => {
-                            attributeMappingApi.updateMany({
-                                attribute: value ?? "",
-                                update: {
-                                    value: e?.value || "",
-                                    unique:
-                                        attributeMapping[value ?? ""]?.unique ||
-                                        unique,
-                                    valueType,
-                                },
-                            });
-                            if (
-                                e &&
-                                e.value &&
-                                currentMappingValues.indexOf(e.value) !== -1
-                            ) {
-                                toast({
-                                    title: "Variable reused",
-                                    description: `Variable ${e.label} already used`,
-                                    status: "warning",
-                                    duration: 9000,
-                                    isClosable: true,
-                                });
-                            }
-                        }}
+                    <FieldMapper
+                        source={metadata.sourceColumns}
+                        onUpdate={(attribute, key, value) =>
+                            attributeMappingApi.update({
+                                attribute,
+                                key,
+                                value,
+                            })
+                        }
+                        isSpecific={attributeMapping[value]?.isSpecific}
+                        isCustom={attributeMapping[value]?.isCustom}
+                        attribute={value}
+                        value={attributeMapping[value]?.value}
+                        customType={attributeMapping[value]?.customType}
+                        mappedValues={mappedValues}
                     />
                 );
             },
@@ -229,13 +173,13 @@ export default function AttributeMapping() {
             title: "Options",
             key: "value",
             width: "200px",
-            render: (text, { value, optionSetValue, availableOptions }) => {
-                const current = value ?? "";
+            render: (_, { value = "", optionSetValue, availableOptions }) => {
+                const mapping = attributeMapping[value]?.value || "";
                 if (optionSetValue) {
                     return (
                         <OptionSetMapping
-                            value={current}
-                            disabled={current === ""}
+                            value={value}
+                            disabled={mapping === ""}
                             destinationOptions={availableOptions || []}
                             mapping={attributeMapping}
                         />
@@ -258,51 +202,6 @@ export default function AttributeMapping() {
             key: "mapped",
         },
     ];
-
-    useEffect(() => {
-        for (const {
-            value: destinationValue,
-            unique,
-            label: destinationLabel,
-            mandatory,
-        } of metadata.destinationAttributes) {
-            if (attributeMapping[destinationValue ?? ""] === undefined) {
-                const search = metadata.sourceColumns.find(
-                    ({ value }) =>
-                        value &&
-                        destinationValue &&
-                        value.includes(destinationValue),
-                );
-                if (search) {
-                    attributeMappingApi.updateMany({
-                        attribute: `${destinationValue}`,
-                        update: {
-                            value: search.value,
-                            unique,
-                            mandatory,
-                        },
-                    });
-                } else {
-                    const search2 = metadata.sourceColumns.find(
-                        ({ label }) =>
-                            label &&
-                            destinationLabel &&
-                            label.includes(destinationLabel),
-                    );
-                    if (search2) {
-                        attributeMappingApi.updateMany({
-                            attribute: `${destinationValue}`,
-                            update: {
-                                value: search2.value,
-                                unique,
-                                mandatory,
-                            },
-                        });
-                    }
-                }
-            }
-        }
-    }, []);
 
     const setCustom = (attribute: string, manual: boolean) => {
         const isSpecific = attributeMapping[attribute]?.isSpecific;
@@ -338,6 +237,32 @@ export default function AttributeMapping() {
         }
     };
 
+    const autoMap = async (map: boolean) => {
+        onOpen();
+        setMessage(() => "Trying to automatically map");
+        createMapping({
+            map,
+            destinationOptions: metadata.destinationAttributes,
+            sourceOptions: metadata.sourceColumns,
+            mapping: attributeMapping,
+            onMap(destinationValue, search) {
+                if (search !== undefined) {
+                    attributeMappingApi.updateMany({
+                        attribute: destinationValue,
+                        update: {
+                            value: search.value,
+                            isManual: false,
+                        },
+                    });
+                }
+            },
+            onUnMap(destinationValue) {
+                attributeMappingApi.remove(destinationValue);
+            },
+        });
+        onClose();
+    };
+
     return (
         <Stack
             h="calc(100vh - 350px)"
@@ -355,16 +280,19 @@ export default function AttributeMapping() {
                     title="Track Entity Column"
                     title2="Custom Track Entity Column"
                 />
-                <InfoMapping
-                    customColumn="customGeometryColumn"
-                    value={geometryColumn}
-                    column="geometryColumn"
-                    isChecked={customGeometryColumn}
-                    update={attributeMappingApi.update}
-                    title="Geometry Column"
-                    title2="Custom Geometry Column"
-                    isMulti
-                />
+                {program.trackedEntityType?.featureType !== "NONE" &&
+                    program.trackedEntityType?.featureType !== undefined && (
+                        <InfoMapping
+                            customColumn="customGeometryColumn"
+                            value={geometryColumn}
+                            column="geometryColumn"
+                            isChecked={customGeometryColumn}
+                            update={attributeMappingApi.update}
+                            title="Geometry Column"
+                            title2="Custom Geometry Column"
+                            isMulti
+                        />
+                    )}
             </Stack>
             <Stack spacing={[1, 5]} direction={["column", "row"]}>
                 <Checkbox
@@ -394,7 +322,15 @@ export default function AttributeMapping() {
                 >
                     Update Entities
                 </Checkbox>
+                <Checkbox
+                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                        autoMap(e.target.checked)
+                    }
+                >
+                    Auto Map
+                </Checkbox>
             </Stack>
+
             <Search
                 options={metadata.destinationAttributes}
                 source={metadata.sourceAttributes}
@@ -420,6 +356,12 @@ export default function AttributeMapping() {
                         of {metadata.destinationAttributes?.length || 0}
                     </Text>
                 )}
+            />
+            <Progress
+                onClose={onClose}
+                isOpen={isOpen}
+                message={message}
+                onOpen={onOpen}
             />
         </Stack>
     );

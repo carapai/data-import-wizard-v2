@@ -21,7 +21,6 @@ export default function StepperButtons({
     const activeStep = useStore($steps);
     const navigate = useNavigate<LocationGenerics>();
     const step = steps[activeStep];
-    console.log(disabled);
     return (
         <>
             {activeStep === steps.length - 1 ? (

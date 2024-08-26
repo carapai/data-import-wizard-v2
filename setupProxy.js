@@ -29,6 +29,7 @@ const options = {
     target: "https://sd.emis.ac.sz/emis",
     // target: "https://ucndw.afro.who.int/dev",
     // target: "https://play.im.dhis2.org/stable-2-41-0-1",
+    // target: "https://customization.health.go.ug/hmis",
     onProxyReq,
     onProxyRes,
     changeOrigin: true,

@@ -1,5 +1,7 @@
 import { usePagination } from "@ajna/pagination";
 import {
+    Box,
+    Checkbox,
     Icon,
     Stack,
     Table,
@@ -24,6 +26,7 @@ import DestinationIcon from "../DestinationIcon";
 import Paginated from "../Paginated";
 import Search from "../Search";
 import SourceIcon from "../SourceIcon";
+import Progress from "../Progress";
 
 export default function Attribution() {
     const { isOpen, onOpen, onClose } = useDisclosure();
@@ -31,7 +34,7 @@ export default function Attribution() {
     const metadata = useStore($metadata);
     const { source, destination } = useStore($names);
     const [currentAttributes, setCurrentAttributes] = useState(
-        metadata.destinationCategoryOptionCombos
+        metadata.destinationCategoryOptionCombos,
     );
 
     const mapping = useStore($mapping);
@@ -62,7 +65,7 @@ export default function Attribution() {
         },
     });
 
-    useEffect(() => {
+    const autoMap = () => {
         onOpen();
         for (const {
             value: destinationValue,
@@ -70,7 +73,7 @@ export default function Attribution() {
         } of metadata.destinationCategoryOptionCombos) {
             if (attributionMapping[destinationValue ?? ""] === undefined) {
                 const search = metadata.sourceCategoryOptionCombos.find(
-                    ({ value }) => value === destinationValue
+                    ({ value }) => value === destinationValue,
                 );
                 if (search) {
                     attributionMappingApi.updateMany({
@@ -81,7 +84,7 @@ export default function Attribution() {
                     });
                 } else {
                     const search2 = metadata.sourceCategoryOptionCombos.find(
-                        ({ label }) => label === destinationLabel
+                        ({ label }) => label === destinationLabel,
                     );
                     if (search2) {
                         attributionMappingApi.updateMany({
@@ -95,7 +98,7 @@ export default function Attribution() {
             }
         }
         onClose();
-    }, []);
+    };
 
     const handlePageChange = (nextPage: number): void => {
         setCurrentPage(nextPage);
@@ -146,17 +149,30 @@ export default function Attribution() {
             maxH="calc(100vh - 350px)"
             overflow="auto"
         >
-            <Search
-                options={metadata.destinationCategoryOptionCombos}
-                mapping={attributionMapping}
-                searchString={searchString}
-                setSearchString={setSearchString}
-                action={setCurrentAttributes}
-                source={metadata.sourceCategoryOptionCombos}
-                placeholder="Search attributes"
-                label="Show Mapped Attributes Only"
-                label2="Show Unmapped Attributes Only"
-            />
+            <Stack direction="row">
+                <Checkbox
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                        if (e.target.checked) {
+                            autoMap();
+                        }
+                    }}
+                >
+                    Auto Map
+                </Checkbox>
+                <Box flex={1}>
+                    <Search
+                        options={metadata.destinationCategoryOptionCombos}
+                        mapping={attributionMapping}
+                        searchString={searchString}
+                        setSearchString={setSearchString}
+                        action={setCurrentAttributes}
+                        source={metadata.sourceCategoryOptionCombos}
+                        placeholder="Search attributes"
+                        label="Show Mapped Attributes Only"
+                        label2="Show Unmapped Attributes Only"
+                    />
+                </Box>
+            </Stack>
             <Table size="sm">
                 <Thead>
                     <Tr>
@@ -184,7 +200,7 @@ export default function Attribution() {
                     {currentAttributes
                         .slice(
                             currentPage * pageSize - pageSize,
-                            pageSize * currentPage
+                            pageSize * currentPage,
                         )
                         .map(({ value, label }) => (
                             <Tr
@@ -199,7 +215,7 @@ export default function Attribution() {
                                             (val) =>
                                                 val.value ===
                                                 attributionMapping[value ?? ""]
-                                                    ?.value
+                                                    ?.value,
                                         )}
                                         options={
                                             metadata.sourceCategoryOptionCombos
@@ -214,8 +230,8 @@ export default function Attribution() {
                                                             value:
                                                                 e?.value || "",
                                                         },
-                                                    }
-                                                )
+                                                    },
+                                                ),
                                             )
                                         }
                                     />
@@ -239,7 +255,7 @@ export default function Attribution() {
                             Mapped{" "}
                             {
                                 Object.values(attributionMapping).filter(
-                                    ({ value }) => !!value
+                                    ({ value }) => !!value,
                                 ).length
                             }{" "}
                             of {metadata.destinationCategoryOptionCombos.length}
@@ -254,6 +270,12 @@ export default function Attribution() {
                 handlePageSizeChange={handlePageSizeChange}
                 handlePageChange={handlePageChange}
                 pageSize={pageSize}
+            />
+            <Progress
+                onClose={onClose}
+                isOpen={isOpen}
+                message="Auto mapping please wait"
+                onOpen={onOpen}
             />
         </Stack>
     );

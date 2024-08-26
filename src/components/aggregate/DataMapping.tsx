@@ -1,29 +1,31 @@
-import { Checkbox, Icon, Input, Stack, Text } from "@chakra-ui/react";
+import {
+    Box,
+    Checkbox,
+    Icon,
+    Input,
+    Stack,
+    Text,
+    useDisclosure,
+} from "@chakra-ui/react";
 import { GroupBase, Select } from "chakra-react-select";
 import { Option } from "data-import-wizard-utils";
 import { useStore } from "effector-react";
 import { FiCheck } from "react-icons/fi";
 
 import Table, { ColumnsType } from "antd/es/table";
-import { ChangeEvent, useEffect, useState } from "react";
+import { ChangeEvent, useState } from "react";
 import { attributeMappingApi } from "../../Events";
-import {
-    $attributeMapping,
-    $mapping,
-    $metadata,
-    $names,
-    $programIndicators,
-} from "../../Store";
+import { $attributeMapping, $mapping, $metadata, $names } from "../../Store";
 import DestinationIcon from "../DestinationIcon";
+import Progress from "../Progress";
 import Search from "../Search";
 import SourceIcon from "../SourceIcon";
 
 const DataMapping = () => {
     const attributeMapping = useStore($attributeMapping);
+    const { isOpen, onOpen, onClose } = useDisclosure();
     const mapping = useStore($mapping);
     const metadata = useStore($metadata);
-    const programIndicators = useStore($programIndicators);
-    console.log(programIndicators);
     const { source, destination } = useStore($names);
     const [currentAttributes, setCurrentAttributes] = useState(
         metadata.destinationColumns,
@@ -174,7 +176,7 @@ const DataMapping = () => {
         },
     ];
 
-    useEffect(() => {
+    const autoMap = () => {
         for (const {
             value: destinationValue,
             unique,
@@ -211,24 +213,38 @@ const DataMapping = () => {
                 }
             }
         }
-    }, []);
+    };
+
     return (
         <Stack
             h="calc(100vh - 350px)"
             maxH="calc(100vh - 350px)"
             overflow="auto"
         >
-            <Search
-                options={metadata.destinationColumns}
-                source={[]}
-                mapping={attributeMapping}
-                searchString={searchString}
-                setSearchString={setSearchString}
-                action={setCurrentAttributes}
-                placeholder="Search attributes"
-                label="Show Mapped Attributes Only"
-                label2="Show Unmapped Attributes Only"
-            />
+            <Stack direction="row">
+                <Checkbox
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                        if (e.target.checked) {
+                            autoMap();
+                        }
+                    }}
+                >
+                    Auto Map
+                </Checkbox>
+                <Box flex={1}>
+                    <Search
+                        options={metadata.destinationColumns}
+                        source={[]}
+                        mapping={attributeMapping}
+                        searchString={searchString}
+                        setSearchString={setSearchString}
+                        action={setCurrentAttributes}
+                        placeholder="Search attributes"
+                        label="Show Mapped Attributes Only"
+                        label2="Show Unmapped Attributes Only"
+                    />
+                </Box>
+            </Stack>
 
             <Table
                 columns={columns}
@@ -242,6 +258,13 @@ const DataMapping = () => {
                         {metadata.destinationColumns?.length || 0}
                     </Text>
                 )}
+            />
+
+            <Progress
+                onClose={onClose}
+                isOpen={isOpen}
+                message="Auto mapping please wait"
+                onOpen={onOpen}
             />
         </Stack>
     );

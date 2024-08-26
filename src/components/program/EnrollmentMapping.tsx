@@ -1,32 +1,31 @@
-import {
-    Box,
-    Checkbox,
-    Icon,
-    Input,
-    Stack,
-    Text,
-    useToast,
-} from "@chakra-ui/react";
+import { Checkbox, Icon, Stack, Text, useDisclosure } from "@chakra-ui/react";
 import { Table } from "antd";
 import { ColumnsType } from "antd/es/table";
-import { GroupBase, Select } from "chakra-react-select";
 import { Option } from "data-import-wizard-utils";
 import { useStore } from "effector-react";
 import { FiCheck } from "react-icons/fi";
 
-import { ChangeEvent, useEffect, useState } from "react";
+import { ChangeEvent, useState } from "react";
 import { enrollmentMappingApi } from "../../Events";
-import { $enrollmentMapping, $mapping, $metadata, $names } from "../../Store";
-import { findMapped, isMapped } from "../../utils/utils";
-import CustomColumn from "../CustomColumn";
+import {
+    $enrollmentMapping,
+    $mapping,
+    $metadata,
+    $names,
+    $program,
+} from "../../Store";
+import { createMapping, findMapped, isMapped } from "../../utils/utils";
 import DestinationIcon from "../DestinationIcon";
-import MultipleSelect from "../MultipleSelect";
+import FieldMapper from "../FieldMapper";
+import InfoMapping from "../InfoMapping";
 import OptionSetMapping from "../OptionSetMapping";
+import Progress from "../Progress";
 import Search from "../Search";
 import SourceIcon from "../SourceIcon";
-import InfoMapping from "../InfoMapping";
 
 export default function EnrollmentMapping() {
+    const { isOpen, onOpen, onClose } = useDisclosure();
+    const [message, setMessage] = useState<string>("");
     const {
         info: {
             customEnrollmentDateColumn,
@@ -54,17 +53,16 @@ export default function EnrollmentMapping() {
         ...enrollmentMapping
     } = useStore($enrollmentMapping);
     const programMapping = useStore($mapping);
-    const toast = useToast();
+    const program = useStore($program);
     const metadata = useStore($metadata);
     const { source, destination } = useStore($names);
     const [attributes, setCurrentAttributes] = useState(
         metadata.destinationEnrollmentAttributes,
     );
-
     const [searchString, setSearchString] = useState<string>("");
 
-    const currentMappingValues = Object.values(enrollmentMapping).map(
-        ({ value }) => value,
+    const mappedValues = Object.values(enrollmentMapping).map(
+        ({ value = "" }) => value,
     );
 
     const columns: ColumnsType<Partial<Option>> = [
@@ -84,7 +82,7 @@ export default function EnrollmentMapping() {
             key: "mandatory",
             width: "100px",
             align: "center",
-            render: (text, { value, mandatory }) => (
+            render: (_, { value, mandatory }) => (
                 <Checkbox
                     isChecked={
                         enrollmentMapping[value ?? ""]?.mandatory || mandatory
@@ -105,7 +103,7 @@ export default function EnrollmentMapping() {
             key: "unique",
             width: "100px",
             align: "center",
-            render: (text, { value, unique }) => (
+            render: (_, { value, unique }) => (
                 <Checkbox
                     isChecked={enrollmentMapping[value ?? ""]?.unique || unique}
                     isReadOnly={unique}
@@ -124,7 +122,7 @@ export default function EnrollmentMapping() {
             key: "manual",
             width: "100px",
             align: "center",
-            render: (text, { value }) => (
+            render: (_, { value }) => (
                 <Checkbox
                     isChecked={enrollmentMapping[value ?? ""]?.isCustom}
                     onChange={(e: ChangeEvent<HTMLInputElement>) =>
@@ -138,7 +136,7 @@ export default function EnrollmentMapping() {
             key: "specific",
             width: "100px",
             align: "center",
-            render: (text, { value }) => (
+            render: (_, { value }) => (
                 <Checkbox
                     isChecked={enrollmentMapping[value ?? ""]?.isSpecific}
                     onChange={(e: ChangeEvent<HTMLInputElement>) =>
@@ -156,79 +154,23 @@ export default function EnrollmentMapping() {
                 </Stack>
             ),
             key: "source",
-            render: (text, { value, valueType, unique }) => {
-                if (enrollmentMapping[value ?? ""]?.isCustom) {
-                    return (
-                        <CustomColumn
-                            mapping={enrollmentMapping}
-                            onTypeUpdate={(e) =>
-                                enrollmentMappingApi.update({
-                                    attribute: `${value}`,
-                                    key: "customType",
-                                    value: e?.value,
-                                })
-                            }
-                            onValueChange={(val) =>
-                                enrollmentMappingApi.update({
-                                    attribute: `${value}`,
-                                    key: "value",
-                                    value: val,
-                                })
-                            }
-                            value={value ?? ""}
-                        />
-                    );
-                }
-
-                if (enrollmentMapping[value ?? ""]?.isSpecific) {
-                    return (
-                        <Input
-                            value={enrollmentMapping[value ?? ""]?.value}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                                enrollmentMappingApi.update({
-                                    attribute: `${value}`,
-                                    key: "value",
-                                    value: e.target.value,
-                                })
-                            }
-                        />
-                    );
-                }
+            render: (_, { value = "" }) => {
                 return (
-                    <Select<Option, false, GroupBase<Option>>
-                        value={metadata.sourceColumns?.find(
-                            (val) =>
-                                val.value ===
-                                enrollmentMapping[value ?? ""]?.value,
-                        )}
-                        options={metadata.sourceColumns}
-                        isClearable
-                        size="md"
-                        onChange={(e) => {
-                            enrollmentMappingApi.updateMany({
-                                attribute: value ?? "",
-                                update: {
-                                    value: e?.value || "",
-                                    unique:
-                                        enrollmentMapping[value ?? ""]
-                                            ?.unique || unique,
-                                    valueType,
-                                },
-                            });
-                            if (
-                                e &&
-                                e.value &&
-                                currentMappingValues.indexOf(e.value) !== -1
-                            ) {
-                                toast({
-                                    title: "Variable reused",
-                                    description: `Variable ${e.label} already used`,
-                                    status: "warning",
-                                    duration: 9000,
-                                    isClosable: true,
-                                });
-                            }
-                        }}
+                    <FieldMapper
+                        source={metadata.sourceColumns}
+                        onUpdate={(attribute, key, value) =>
+                            enrollmentMappingApi.update({
+                                attribute,
+                                key,
+                                value,
+                            })
+                        }
+                        isSpecific={enrollmentMapping[value]?.isSpecific}
+                        isCustom={enrollmentMapping[value]?.isCustom}
+                        attribute={value}
+                        value={enrollmentMapping[value]?.value}
+                        customType={enrollmentMapping[value]?.customType}
+                        mappedValues={mappedValues}
                     />
                 );
             },
@@ -237,13 +179,13 @@ export default function EnrollmentMapping() {
             title: "Options",
             key: "value",
             width: "200px",
-            render: (text, { value, optionSetValue, availableOptions }) => {
-                const current = value || "";
+            render: (_, { value = "", optionSetValue, availableOptions }) => {
+                const mapping = enrollmentMapping[value]?.value || "";
                 if (optionSetValue) {
                     return (
                         <OptionSetMapping
-                            value={current}
-                            disabled={current === ""}
+                            value={value}
+                            disabled={mapping === ""}
                             destinationOptions={availableOptions || []}
                             mapping={enrollmentMapping}
                         />
@@ -266,51 +208,6 @@ export default function EnrollmentMapping() {
             key: "mapped",
         },
     ];
-
-    useEffect(() => {
-        for (const {
-            value: destinationValue,
-            unique,
-            label: destinationLabel,
-            mandatory,
-        } of metadata.destinationEnrollmentAttributes) {
-            if (enrollmentMapping[destinationValue ?? ""] === undefined) {
-                const search = metadata.sourceColumns.find(
-                    ({ value }) =>
-                        value &&
-                        destinationValue &&
-                        value.includes(destinationValue),
-                );
-                if (search) {
-                    enrollmentMappingApi.updateMany({
-                        attribute: `${destinationValue}`,
-                        update: {
-                            value: search.value,
-                            unique,
-                            mandatory,
-                        },
-                    });
-                } else {
-                    const search2 = metadata.sourceColumns.find(
-                        ({ label }) =>
-                            label &&
-                            destinationLabel &&
-                            label.includes(destinationLabel),
-                    );
-                    if (search2) {
-                        enrollmentMappingApi.updateMany({
-                            attribute: `${destinationValue}`,
-                            update: {
-                                value: search2.value,
-                                unique,
-                                mandatory,
-                            },
-                        });
-                    }
-                }
-            }
-        }
-    }, []);
 
     const setCustom = (attribute: string, manual: boolean) => {
         const isSpecific = enrollmentMapping[attribute]?.isSpecific;
@@ -344,6 +241,31 @@ export default function EnrollmentMapping() {
                 value: !isManual,
             });
         }
+    };
+    const autoMap = async (map: boolean) => {
+        onOpen();
+        setMessage(() => "Trying to automatically map");
+        createMapping({
+            map,
+            destinationOptions: metadata.destinationEnrollmentAttributes,
+            sourceOptions: metadata.sourceColumns,
+            mapping: enrollmentMapping,
+            onMap(destinationValue, search) {
+                if (search !== undefined) {
+                    enrollmentMappingApi.updateMany({
+                        attribute: destinationValue,
+                        update: {
+                            value: search.value,
+                            isManual: false,
+                        },
+                    });
+                }
+            },
+            onUnMap(destinationValue) {
+                enrollmentMappingApi.remove(destinationValue);
+            },
+        });
+        onClose();
     };
 
     return (
@@ -382,16 +304,19 @@ export default function EnrollmentMapping() {
                     title="Incident Date Column"
                     title2="Custom Incident Column"
                 />
-                <InfoMapping
-                    customColumn="customGeometryColumn"
-                    value={geometryColumn}
-                    column="geometryColumn"
-                    isChecked={customGeometryColumn}
-                    update={enrollmentMappingApi.update}
-                    title="Geometry Column"
-                    title2="Custom Geometry Column"
-                    isMulti
-                />
+                {program.featureType !== "NONE" &&
+                    program.featureType !== undefined && (
+                        <InfoMapping
+                            customColumn="customGeometryColumn"
+                            value={geometryColumn}
+                            column="geometryColumn"
+                            isChecked={customGeometryColumn}
+                            update={enrollmentMappingApi.update}
+                            title="Geometry Column"
+                            title2="Custom Geometry Column"
+                            isMulti
+                        />
+                    )}
             </Stack>
             <Stack spacing={[1, 5]} direction={["column", "row"]}>
                 <Checkbox
@@ -421,7 +346,15 @@ export default function EnrollmentMapping() {
                 >
                     Update Enrollments
                 </Checkbox>
+                <Checkbox
+                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                        autoMap(e.target.checked)
+                    }
+                >
+                    Auto Map
+                </Checkbox>
             </Stack>
+
             <Search
                 options={metadata.destinationEnrollmentAttributes}
                 source={metadata.sourceAttributes}
@@ -448,6 +381,13 @@ export default function EnrollmentMapping() {
                         {metadata.destinationEnrollmentAttributes?.length || 0}
                     </Text>
                 )}
+            />
+
+            <Progress
+                onClose={onClose}
+                isOpen={isOpen}
+                message={message}
+                onOpen={onOpen}
             />
         </Stack>
     );

@@ -1,18 +1,16 @@
 import {
+    Box,
     Button,
     Checkbox,
     Icon,
-    Input,
     Stack,
     Text,
     useDisclosure,
 } from "@chakra-ui/react";
 import { useDataEngine } from "@dhis2/app-runtime";
 import Table, { ColumnsType } from "antd/es/table";
-import { GroupBase, Select } from "chakra-react-select";
-import { Option } from "data-import-wizard-utils";
+import { Option, RealMapping } from "data-import-wizard-utils";
 import { useStore } from "effector-react";
-import { getOr } from "lodash/fp";
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { FiCheck } from "react-icons/fi";
 import {
@@ -29,9 +27,10 @@ import {
     $organisationUnitMapping,
     $remoteOrganisationApi,
 } from "../Store";
-import { findMapped, isMapped } from "../utils/utils";
+import { createMapping, findMapped, isMapped } from "../utils/utils";
 import { APICredentialsModal } from "./APICredentialsModal";
 import DestinationIcon from "./DestinationIcon";
+import FieldMapper from "./FieldMapper";
 import InfoMapping from "./InfoMapping";
 import Progress from "./Progress";
 import Search from "./Search";
@@ -63,6 +62,18 @@ export default function OrganisationUnitMapping() {
         metadata.destinationOrgUnits,
     );
     const [ouSearch, setOuSearch] = useState<string>("");
+    const mapManually = (
+        attribute: string,
+        key: keyof RealMapping,
+        value: string,
+    ) => {
+        ouMappingApi.update({
+            attribute,
+            key,
+            value,
+        });
+        ouMappingApi.update({ attribute, key: "isManual", value: true });
+    };
     const columns: ColumnsType<Partial<Option>> = [
         {
             title: (
@@ -76,9 +87,9 @@ export default function OrganisationUnitMapping() {
             key: "label",
         },
         {
-            title: "Custom Path",
+            title: "Specific Value",
             key: "manual",
-            width: "100px",
+            width: "200px",
             align: "center",
             render: (text, { value }) => (
                 <Checkbox
@@ -104,65 +115,18 @@ export default function OrganisationUnitMapping() {
                 </Stack>
             ),
             key: "source",
-            render: (_, { value }) => {
-                if (
-                    getOr(
-                        {
-                            value: "",
-                            isCustom: false,
-                        },
-                        value ?? "",
-                        organisationUnitMapping,
-                    ).isCustom
-                ) {
-                    return (
-                        <Input
-                            value={
-                                getOr(
-                                    {
-                                        value: "",
-                                        isCustom: false,
-                                    },
-                                    value ?? "",
-                                    organisationUnitMapping,
-                                ).value
-                            }
-                            onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                                ouMappingApi.update({
-                                    attribute: `${value}`,
-                                    key: "value",
-                                    value: e.target.value,
-                                })
-                            }
-                        />
-                    );
-                }
-                return (
-                    <Select<Option, false, GroupBase<Option>>
-                        value={metadata.sourceOrgUnits.find(
-                            (val) =>
-                                val.value ===
-                                getOr(
-                                    {
-                                        value: "",
-                                        manual: false,
-                                    },
-                                    value ?? "",
-                                    organisationUnitMapping,
-                                ).value,
-                        )}
-                        options={metadata.sourceOrgUnits}
-                        isClearable
-                        onChange={(e) =>
-                            ouMappingApi.update({
-                                attribute: `${value}`,
-                                key: "value",
-                                value: e?.value,
-                            })
-                        }
-                    />
-                );
-            },
+            render: (_, { value = "" }) => (
+                <FieldMapper
+                    source={metadata.sourceOrgUnits}
+                    onUpdate={(attribute, key, value) =>
+                        mapManually(attribute, key, value)
+                    }
+                    isMulti
+                    isSpecific={organisationUnitMapping[value]?.isSpecific}
+                    attribute={value}
+                    value={organisationUnitMapping[value]?.value}
+                />
+            ),
         },
 
         {
@@ -220,27 +184,30 @@ export default function OrganisationUnitMapping() {
         return () => {};
     }, []);
 
-    useEffect(() => {
+    const autoMap = async (map: boolean) => {
         onOpen();
         setMessage(() => "Trying to automatically map");
-        for (const {
-            value: destinationValue,
-        } of metadata.destinationOrgUnits) {
-            if (organisationUnitMapping[destinationValue ?? ""] === undefined) {
-                const search = metadata.sourceOrgUnits.find(
-                    ({ value, label }) => destinationValue === value,
-                );
-                if (search) {
-                    ouMappingApi.update({
-                        attribute: `${destinationValue}`,
-                        key: "value",
-                        value: search.value,
+        createMapping({
+            map,
+            destinationOptions: metadata.destinationOrgUnits,
+            sourceOptions: metadata.sourceOrgUnits,
+            mapping: organisationUnitMapping,
+            onMap(destinationValue, search) {
+                if (search !== undefined) {
+                    ouMappingApi.updateMany({
+                        [destinationValue]: {
+                            value: search.value,
+                            isManual: false,
+                        },
                     });
                 }
-            }
-        }
+            },
+            onUnMap(destinationValue) {
+                ouMappingApi.remove(destinationValue);
+            },
+        });
         onClose();
-    }, [orgUnitColumn, querying]);
+    };
 
     const onOK = async () => {
         setFetching(() => true);
@@ -262,6 +229,7 @@ export default function OrganisationUnitMapping() {
             h="calc(100vh - 350px)"
             maxH="calc(100vh - 350px)"
             overflow="auto"
+            spacing="20px"
         >
             <Stack direction="row" alignItems="center" spacing="30px">
                 {[
@@ -270,6 +238,7 @@ export default function OrganisationUnitMapping() {
                     "dhis2-data-set",
                     "dhis2-program",
                     "manual-dhis2-program-indicators",
+                    "fhir",
                 ].indexOf(mapping.dataSource ?? "") === -1 && (
                     <InfoMapping
                         customColumn="customOrgUnitColumn"
@@ -317,17 +286,28 @@ export default function OrganisationUnitMapping() {
                     </Stack>
                 )}
             </Stack>
-            <Search
-                options={metadata.destinationOrgUnits}
-                action={setCurrentOrganisations}
-                source={metadata.sourceOrgUnits}
-                searchString={ouSearch}
-                setSearchString={setOuSearch}
-                mapping={organisationUnitMapping}
-                label="Show Mapped Organisations Only"
-                label2="Show Unmapped Organisations Only"
-                placeholder="Search organisation units"
-            />
+            <Checkbox
+                onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                    autoMap(e.target.checked)
+                }
+            >
+                Auto Map
+            </Checkbox>
+            <Stack direction="row">
+                <Box flex={1}>
+                    <Search
+                        options={metadata.destinationOrgUnits}
+                        action={setCurrentOrganisations}
+                        source={metadata.sourceOrgUnits}
+                        searchString={ouSearch}
+                        setSearchString={setOuSearch}
+                        mapping={organisationUnitMapping}
+                        label="Show Mapped Organisations Only"
+                        label2="Show Unmapped Organisations Only"
+                        placeholder="Search organisation units"
+                    />
+                </Box>
+            </Stack>
             <Table
                 columns={columns}
                 dataSource={currentOrganisations}

@@ -1,5 +1,5 @@
 import { OptionBase } from "chakra-react-select";
-import { AggConflict } from "data-import-wizard-utils";
+import { AggConflict, RealMapping } from "data-import-wizard-utils";
 import Dexie, { Table } from "dexie";
 import { DataNode } from "./Interfaces";
 
@@ -41,9 +41,10 @@ export class CQIDexie extends Dexie {
         }>;
         completed: string;
     }>;
+    organisationMapping!: Table<Partial<RealMapping>>;
     constructor() {
         super("diw");
-        this.version(8).stores({
+        this.version(1).stores({
             organisations: "++id,value,pId,title",
             expandedKeys: "++id,name",
             levels: "++value,label",
@@ -52,6 +53,7 @@ export class CQIDexie extends Dexie {
             trackerResponses: "id,completed",
             dataValueConflicts: "object",
             dataValueErrors: "uid,object",
+            organisationMapping: "&destination",
         });
     }
 }

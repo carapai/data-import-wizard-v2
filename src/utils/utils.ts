@@ -117,10 +117,9 @@ export const getSheetData = (
 export const generateData = (
     mapping: Partial<IMapping>,
     workbook: WorkBook,
-    sheet: string,
     extraction: Extraction,
 ) => {
-    const sheetData = workbook.Sheets[sheet];
+    const sheetData = workbook.Sheets[mapping.sheet ?? "Sheet 1"];
     if (extraction === "json") {
         if (mapping.headerRow === 1 && mapping.dataStartRow === 2) {
             return utils.sheet_to_json(sheetData, {
@@ -785,3 +784,90 @@ export const findUniqueDataSetCompletions = (
 };
 
 export const processProgramMapping = () => {};
+
+export const searchMapping = ({
+    destinationCode,
+    destinationLabel,
+    destinationValue,
+    sourceOptions,
+}: {
+    destinationValue: string;
+    destinationLabel: string;
+    destinationCode: string;
+    sourceOptions: Option[];
+}) => {
+    let search = sourceOptions.find(({ value }) => destinationValue === value);
+    if (search === undefined) {
+        search = sourceOptions.find(
+            ({ code }) => code && code.includes(destinationCode),
+        );
+    }
+    if (search === undefined) {
+        search = sourceOptions.find(
+            ({ code }) => code && code.includes(destinationValue),
+        );
+    }
+    if (search === undefined) {
+        search = sourceOptions.find(({ label }) =>
+            label.includes(destinationValue),
+        );
+    }
+    if (search === undefined) {
+        search = sourceOptions.find(({ value }) => value === destinationLabel);
+    }
+
+    if (search === undefined) {
+        search = sourceOptions.find(({ label }) => label === destinationLabel);
+    }
+
+    if (search === undefined) {
+        search = sourceOptions.find(({ label }) => label === destinationLabel);
+    }
+
+    if (search === undefined) {
+        search = sourceOptions.find(
+            ({ code }) => code && code.includes(destinationLabel),
+        );
+    }
+    return search;
+};
+
+export const createMapping = ({
+    destinationOptions,
+    map,
+    mapping,
+    sourceOptions,
+    onMap,
+    onUnMap,
+}: {
+    destinationOptions: Option[];
+    sourceOptions: Option[];
+    map: boolean;
+    mapping: Mapping;
+    onMap: (destinationValue: string, search: any) => void;
+    onUnMap: (destinationValue: string) => void;
+}) => {
+    let i = 0;
+    for (const {
+        value: destinationValue = "",
+        label: destinationLabel = "",
+        code: destinationCode = "",
+    } of destinationOptions) {
+        const mapValue = mapping[destinationValue];
+        if (map && mapValue === undefined) {
+            const search = searchMapping({
+                destinationCode,
+                destinationLabel,
+                destinationValue,
+                sourceOptions,
+            });
+            onMap(destinationValue, search);
+        } else if (!map && destinationValue && mapValue && !mapValue.isManual) {
+            onUnMap(destinationValue);
+        }
+        if (i === destinationOptions.length) {
+            // onEnd();
+        }
+        i++;
+    }
+};

@@ -9,6 +9,7 @@ import {
     Spacer,
     Stack,
     Text,
+    useDisclosure,
 } from "@chakra-ui/react";
 import { Table } from "antd";
 import { ColumnsType } from "antd/es/table";
@@ -25,12 +26,15 @@ import { FiCheck } from "react-icons/fi";
 import { $mapping, $metadata, $names, $programStageMapping } from "../Store";
 
 import { stageMappingApi } from "../Events";
-import CustomColumn from "./CustomColumn";
+import { createMapping } from "../utils/utils";
 import DestinationIcon from "./DestinationIcon";
+import FieldMapper from "./FieldMapper";
 import OptionSetMapping from "./OptionSetMapping";
 import ColumnMapping from "./program/ColumnMapping";
 import FeatureColumn from "./program/FeatureColumn";
 import SourceIcon from "./SourceIcon";
+import Progress from "./Progress";
+import InfoMapping from "./InfoMapping";
 
 export default function ProgramStageMapping({
     psId,
@@ -42,13 +46,15 @@ export default function ProgramStageMapping({
     repeatable: boolean;
     featureType: string;
 }) {
+    const { isOpen, onOpen, onClose } = useDisclosure();
+    const [message, setMessage] = useState<string>("");
     const mapping = useStore($mapping);
     const programStageMapping = useStore($programStageMapping);
     const metadata = useStore($metadata);
     const { source, destination } = useStore($names);
     const updateStage = (
         attributes: { attribute: string; value: any; key: keyof RealMapping }[],
-        stage: string
+        stage: string,
     ) => {
         for (const { attribute, value, key } of attributes) {
             stageMappingApi.update({
@@ -79,7 +85,7 @@ export default function ProgramStageMapping({
 
     const [searchString, setSearchString] = useState<string>("");
     const [currentElements, setCurrentElements] = useState(
-        programStageDataElements
+        programStageDataElements,
     );
 
     const columns: ColumnsType<Partial<IProgramStageDataElement>> = [
@@ -192,88 +198,29 @@ export default function ProgramStageMapping({
                 if (dataElement) {
                     const { id } = dataElement;
 
-                    if (programStageMapping[psId]?.[id]?.isCustom) {
-                        return (
-                            <CustomColumn
-                                mapping={stageMapping}
-                                value={id}
-                                onTypeUpdate={(e) =>
-                                    updateStage(
-                                        [
-                                            {
-                                                attribute: `${id}`,
-                                                key: "customType",
-                                                value: e?.value ?? "",
-                                            },
-                                        ],
-                                        psId
-                                    )
-                                }
-                                onValueChange={(val) => {
-                                    updateStage(
-                                        [
-                                            {
-                                                attribute: `${id}`,
-                                                key: "value",
-                                                value: val,
-                                            },
-                                        ],
-                                        psId
-                                    );
-                                }}
-                            />
-                        );
-                    }
-                    if (programStageMapping[psId]?.[id]?.isSpecific) {
-                        return (
-                            <Input
-                                value={stageMapping?.[id]?.value}
-                                onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                                    updateStage(
-                                        [
-                                            {
-                                                attribute: `${id}`,
-                                                key: "value",
-                                                value: e.target.value,
-                                            },
-                                        ],
-                                        psId
-                                    )
-                                }
-                            />
-                        );
-                    }
                     return (
-                        <Select<Option, false, GroupBase<Option>>
-                            value={metadata.sourceColumns.find(
-                                (val) => val.value === stageMapping?.[id]?.value
-                            )}
-                            options={metadata.sourceColumns.filter(
-                                ({ value }) => {
-                                    if (stage) {
-                                        return value?.indexOf(stage) !== -1;
-                                    }
-                                    return true;
-                                }
-                            )}
-                            isClearable
-                            onChange={(e) =>
+                        <FieldMapper
+                            source={metadata.sourceColumns}
+                            onUpdate={(attribute, key, value) =>
                                 updateStage(
                                     [
                                         {
-                                            attribute: `info`,
-                                            key: "mandatory",
-                                            value: compulsory,
-                                        },
-                                        {
-                                            attribute: `${id}`,
-                                            key: "value",
-                                            value: e?.value || "",
+                                            attribute,
+                                            key,
+                                            value,
                                         },
                                     ],
-                                    psId
+                                    psId,
                                 )
                             }
+                            isSpecific={
+                                programStageMapping[psId]?.[id]?.isSpecific
+                            }
+                            isCustom={programStageMapping[psId]?.[id]?.isCustom}
+                            attribute={id}
+                            value={stageMapping?.[id]?.value}
+                            customType={stageMapping?.[id]?.customType}
+                            mappedValues={[]}
                         />
                     );
                 }
@@ -325,7 +272,7 @@ export default function ProgramStageMapping({
                                     ({ code, name }) => ({
                                         label: name,
                                         value: code,
-                                    })
+                                    }),
                                 )}
                                 disabled={value === ""}
                                 mapping={programStageMapping[psId]}
@@ -365,8 +312,8 @@ export default function ProgramStageMapping({
         if (checked) {
             setCurrentElements(() =>
                 programStageDataElements.filter(
-                    ({ dataElement: { id } }) => mapped.indexOf(id) !== -1
-                )
+                    ({ dataElement: { id } }) => mapped.indexOf(id) !== -1,
+                ),
             );
         } else {
             setCurrentElements(programStageDataElements);
@@ -377,42 +324,9 @@ export default function ProgramStageMapping({
         setSearchString(() => search);
         setCurrentElements(() =>
             programStageDataElements.filter(({ dataElement: { id, name } }) =>
-                name.toLowerCase().includes(search.toLowerCase())
-            )
+                name.toLowerCase().includes(search.toLowerCase()),
+            ),
         );
-    };
-
-    const updateStageAttributes = () => {
-        for (const element of programStageDataElements) {
-            if (rest[`${element.dataElement.id}`] === undefined) {
-                const search = metadata.sourceColumns.find(
-                    ({ value }) =>
-                        value && value.includes(element.dataElement.id)
-                );
-                if (search) {
-                    stageMappingApi.update({
-                        stage: psId,
-                        attribute: element.dataElement.id,
-                        key: "value",
-                        value: search.value,
-                    });
-                } else {
-                    const search2 = metadata.sourceColumns.find(
-                        ({ value }) =>
-                            value && value.includes(element.dataElement.name)
-                    );
-
-                    if (search2) {
-                        stageMappingApi.update({
-                            stage: psId,
-                            attribute: element.dataElement.id,
-                            key: "value",
-                            value: search2.value,
-                        });
-                    }
-                }
-            }
-        }
     };
 
     const onCreateEvents = (e: ChangeEvent<HTMLInputElement>) => {
@@ -422,9 +336,6 @@ export default function ProgramStageMapping({
             key: "createEvents",
             value: e.target.checked,
         });
-        if (e.target.checked) {
-            updateStageAttributes();
-        }
     };
 
     const onUpdateEvents = (e: ChangeEvent<HTMLInputElement>) => {
@@ -434,13 +345,117 @@ export default function ProgramStageMapping({
             key: "updateEvents",
             value: e.target.checked,
         });
-        if (e.target.checked) {
-            updateStageAttributes();
-        }
+    };
+
+    const autoMap = async (map: boolean) => {
+        onOpen();
+        setMessage(() => "Trying to automatically map");
+        createMapping({
+            map,
+            destinationOptions: programStageDataElements.map(
+                ({ dataElement: { id, name, code } }) => ({
+                    code: code,
+                    label: name,
+                    value: id,
+                }),
+            ),
+            sourceOptions: metadata.sourceColumns,
+            mapping: stageMapping,
+            onMap(destinationValue, search) {
+                if (search !== undefined) {
+                    stageMappingApi.update({
+                        stage: psId,
+                        attribute: destinationValue,
+                        key: "value",
+                        value: search.value,
+                    });
+                }
+            },
+            onUnMap(destinationValue) {
+                stageMappingApi.remove({
+                    attribute: destinationValue,
+                    stage: psId,
+                });
+            },
+        });
+        onClose();
     };
 
     return (
         <Stack key={psId} spacing="20px">
+            <Stack direction="row" spacing="20px" alignItems="center">
+                {mapping.dataSource === "dhis2-program" && (
+                    <Stack flex={1} h="100%">
+                        <Text>Specific Stage</Text>
+                        <Box flex={1}>
+                            <Select<Option, false, GroupBase<Option>>
+                                value={metadata.destinationStages.find(
+                                    (val) => val.value === stage,
+                                )}
+                                options={metadata.destinationStages}
+                                isClearable
+                                onChange={(e) => {
+                                    stageMappingApi.update({
+                                        stage: psId,
+                                        attribute: "info",
+                                        key: "stage",
+                                        value: e?.value || "",
+                                    });
+
+                                    if (e) {
+                                        updateStage(
+                                            [
+                                                {
+                                                    attribute: "info",
+                                                    key: "eventDateColumn",
+                                                    value: `${e.value}.eventDate`,
+                                                },
+                                                {
+                                                    attribute: "info",
+                                                    key: "dueDateColumn",
+                                                    value: `${e.value}.dueDate`,
+                                                },
+                                                {
+                                                    attribute: "info",
+                                                    key: "eventIdColumn",
+                                                    value: `${e.value}.event`,
+                                                },
+                                            ],
+                                            psId,
+                                        );
+                                    }
+                                }}
+                            />
+                        </Box>
+                    </Stack>
+                )}
+
+                <ColumnMapping
+                    title="Event Date Column"
+                    customColumn="customEventDateColumn"
+                    value={eventDateColumn}
+                    isCustom={customEventDateColumn}
+                    psId={psId}
+                    valueColumn="eventDateColumn"
+                />
+                <ColumnMapping
+                    title="Due Date Column"
+                    customColumn="customDueDateColumn"
+                    value={eventDateColumn}
+                    isCustom={customDueDateColumn}
+                    psId={psId}
+                    valueColumn="dueDateColumn"
+                />
+
+                <ColumnMapping
+                    title="Event Id Column"
+                    customColumn="customEventIdColumn"
+                    value={eventIdColumn}
+                    isCustom={customEventIdColumn}
+                    psId={psId}
+                    valueColumn="eventIdColumn"
+                />
+            </Stack>
             <Stack spacing={[1, 5]} direction={["column", "row"]}>
                 <Checkbox
                     colorScheme="green"
@@ -500,80 +515,17 @@ export default function ProgramStageMapping({
                 >
                     Create Empty Events
                 </Checkbox>
+                <Checkbox
+                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                        autoMap(e.target.checked)
+                    }
+                >
+                    Auto Map
+                </Checkbox>
             </Stack>
-            <Stack direction="row" spacing="20px" alignItems="center">
-                {mapping.dataSource === "dhis2-program" && (
-                    <Stack flex={1} h="100%">
-                        <Text>Specific Stage</Text>
-                        <Box flex={1}>
-                            <Select<Option, false, GroupBase<Option>>
-                                value={metadata.destinationStages.find(
-                                    (val) => val.value === stage
-                                )}
-                                options={metadata.destinationStages}
-                                isClearable
-                                onChange={(e) => {
-                                    stageMappingApi.update({
-                                        stage: psId,
-                                        attribute: "info",
-                                        key: "stage",
-                                        value: e?.value || "",
-                                    });
 
-                                    if (e) {
-                                        updateStage(
-                                            [
-                                                {
-                                                    attribute: "info",
-                                                    key: "eventDateColumn",
-                                                    value: `${e.value}.eventDate`,
-                                                },
-                                                {
-                                                    attribute: "info",
-                                                    key: "dueDateColumn",
-                                                    value: `${e.value}.dueDate`,
-                                                },
-                                                {
-                                                    attribute: "info",
-                                                    key: "eventIdColumn",
-                                                    value: `${e.value}.event`,
-                                                },
-                                            ],
-                                            psId
-                                        );
-                                    }
-                                }}
-                            />
-                        </Box>
-                    </Stack>
-                )}
-                <ColumnMapping
-                    title="Event Date Column"
-                    customColumn="customEventDateColumn"
-                    value={eventDateColumn}
-                    isCustom={customEventDateColumn}
-                    psId={psId}
-                    valueColumn="eventDateColumn"
-                />
-                <ColumnMapping
-                    title="Due Date Column"
-                    customColumn="customDueDateColumn"
-                    value={eventDateColumn}
-                    isCustom={customDueDateColumn}
-                    psId={psId}
-                    valueColumn="dueDateColumn"
-                />
-
-                <ColumnMapping
-                    title="Event Id Column"
-                    customColumn="customEventIdColumn"
-                    value={eventIdColumn}
-                    isCustom={customEventIdColumn}
-                    psId={psId}
-                    valueColumn="eventIdColumn"
-                />
-            </Stack>
             <FeatureColumn featureType={featureType} psId={psId} />
+
             <Stack direction="row">
                 <Checkbox
                     onChange={(e: ChangeEvent<HTMLInputElement>) =>
@@ -615,6 +567,13 @@ export default function ProgramStageMapping({
                         of {currentElements.length}
                     </Text>
                 )}
+            />
+
+            <Progress
+                onClose={onClose}
+                isOpen={isOpen}
+                message={message}
+                onOpen={onOpen}
             />
         </Stack>
     );

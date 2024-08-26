@@ -247,6 +247,14 @@ export const stageMappingApi = createApi($programStageMapping, {
     ) => {
         return { ...state, ...{ [stage]: { ...state[stage], ...update } } };
     },
+    remove: (
+        state,
+        { attribute, stage }: { attribute: string; stage: string },
+    ) => {
+        const { [stage]: current, ...rest } = state;
+        const { [attribute]: current2, ...rest2 } = current;
+        return { ...rest, ...{ [stage]: rest2 } };
+    },
     reset: () => ({}),
 });
 
@@ -287,6 +295,10 @@ export const attributeMappingApi = createApi($attributeMapping, {
             ...{ [attribute]: { ...state[attribute], ...update } },
         };
     },
+    remove: (state, value: string) => {
+        const { [value]: current, ...rest } = state;
+        return rest;
+    },
     reset: () => ({}),
 });
 export const enrollmentMappingApi = createApi($enrollmentMapping, {
@@ -306,6 +318,10 @@ export const enrollmentMappingApi = createApi($enrollmentMapping, {
             ...{ [attribute]: { ...state[attribute], ...update } },
         };
     },
+    remove: (state, value: string) => {
+        const { [value]: current, ...rest } = state;
+        return rest;
+    },
     reset: () => ({}),
 });
 
@@ -314,6 +330,10 @@ export const ouMappingApi = createApi($organisationUnitMapping, {
         return updateObject(state, payload);
     },
     set: (_, value: Mapping) => value,
+    remove: (state, value: string) => {
+        const { [value]: current, ...rest } = state;
+        return rest;
+    },
     updateMany: (state, update: Mapping) => {
         return { ...state, ...update };
     },

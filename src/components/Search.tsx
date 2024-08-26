@@ -40,7 +40,7 @@ export default function Search({
             return [];
         });
         action(() =>
-            options.filter(({ value }) => mapped.indexOf(value ?? "") !== -1)
+            options.filter(({ value }) => mapped.indexOf(value ?? "") !== -1),
         );
     };
     const filterUnmapped = () => {
@@ -50,7 +50,7 @@ export default function Search({
             return [];
         });
         action(() =>
-            options.filter(({ value }) => mapped.indexOf(value ?? "") === -1)
+            options.filter(({ value }) => mapped.indexOf(value ?? "") === -1),
         );
     };
 
@@ -58,8 +58,8 @@ export default function Search({
         setSearchString(() => search);
         action(() =>
             options.filter(({ value, label }) =>
-                label.toLowerCase().includes(search.toLowerCase())
-            )
+                label.toLowerCase().includes(search.toLowerCase()),
+            ),
         );
     };
 

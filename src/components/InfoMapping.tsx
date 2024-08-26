@@ -5,7 +5,7 @@ import { Event } from "effector";
 import { useStore } from "effector-react";
 
 import { ChangeEvent } from "react";
-import { $metadata } from "../Store";
+import { $mapping, $metadata } from "../Store";
 
 export default function InfoMapping({
     title,
@@ -27,22 +27,35 @@ export default function InfoMapping({
     isMulti?: boolean;
 }) {
     const metadata = useStore($metadata);
+    const mapping = useStore($mapping);
     return (
         <Stack direction="column" flex={1}>
             <Text>{title}</Text>
             <Stack spacing="0" flex={1}>
-                <Checkbox
-                    isChecked={isChecked}
-                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                        update({
-                            attribute: "info",
-                            key: customColumn,
-                            value: e.target.checked,
-                        })
-                    }
-                >
-                    {title2}
-                </Checkbox>
+                {[
+                    "csv-line-list",
+                    "xlsx-line-list",
+                    "xlsx-tabular-data",
+                    "xlsx-form",
+                    "dhis2-data-set",
+                    "dhis2-indicators",
+                    "dhis2-program-indicators",
+                    "dhis2-program",
+                    "manual-dhis2-program-indicators",
+                ].indexOf(mapping.dataSource ?? "") === -1 ? (
+                    <Checkbox
+                        isChecked={isChecked}
+                        onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                            update({
+                                attribute: "info",
+                                key: customColumn,
+                                value: e.target.checked,
+                            })
+                        }
+                    >
+                        {title2}
+                    </Checkbox>
+                ) : null}
                 <Box>
                     {isChecked ? (
                         <Input
