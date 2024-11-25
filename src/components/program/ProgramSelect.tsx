@@ -2,21 +2,21 @@ import { Box, Stack, useDisclosure } from "@chakra-ui/react";
 import { useDataEngine } from "@dhis2/app-runtime";
 import { Table } from "antd";
 import { ColumnsType } from "antd/es/table";
-import { IProgram } from "data-import-wizard-utils";
+import { fetchRemote, IProgram } from "data-import-wizard-utils";
 import { useStore } from "effector-react";
 import { getOr } from "lodash/fp";
-import { mappingApi, programApi } from "../../Events";
+import { CQIDexie } from "../../db";
+import { dataApi, mappingApi, programApi } from "../../Events";
 import { loadProgram, usePrograms } from "../../Queries";
 import { $mapping, stepper } from "../../Store";
 import Loader from "../Loader";
 import Progress from "../Progress";
 
-const ProgramSelect = () => {
+const ProgramSelect = ({ db }: { db: CQIDexie }) => {
     const engine = useDataEngine();
-    const programMapping = useStore($mapping);
+    const mapping = useStore($mapping);
     const { isOpen, onOpen, onClose } = useDisclosure();
     const { isLoading, isError, isSuccess, error, data } = usePrograms(1, 100);
-    const mapping = useStore($mapping);
 
     const columns: ColumnsType<Partial<IProgram>> = [
         {
@@ -37,6 +37,7 @@ const ProgramSelect = () => {
     ];
 
     const onProgramSelect = async (id?: string) => {
+        await db.messages.put({ message: "Loading program", id: 1 });
         if (id) {
             onOpen();
             let data = await loadProgram<Partial<IProgram>>({
@@ -45,21 +46,28 @@ const ProgramSelect = () => {
                 fields: "id,name,registration,featureType,trackedEntityType[id,featureType,trackedEntityTypeAttributes[id,trackedEntityAttribute[id,name,code,unique,generated,pattern,confidential,valueType,optionSetValue,displayFormName,optionSet[id,name,options[id,name,code]]]]],programType,featureType,organisationUnits[id,code,name,parent[name,parent[name,parent[name,parent[name,parent[name]]]]]],programStages[id,repeatable,featureType,name,code,programStageDataElements[id,compulsory,name,dataElement[id,name,code,valueType,optionSetValue,optionSet[id,name,options[id,name,code]]]]],programTrackedEntityAttributes[id,mandatory,sortOrder,allowFutureDate,trackedEntityAttribute[id,name,code,unique,generated,pattern,confidential,valueType,optionSetValue,displayFormName,optionSet[id,name,options[id,name,code]]]]",
                 resource: "programs",
             });
-            const other = programMapping.isSource
+            const other = mapping.isSource
                 ? { source: data.name }
                 : { destination: data.name };
-            mappingApi.update({
-                attribute: "program",
-                value: {
-                    ...programMapping.program,
+            mappingApi.updateMany({
+                program: {
+                    ...mapping.program,
                     trackedEntityType: getOr("", "trackedEntityType.id", data),
                     program: id,
-                    programType: getOr("", "programType", data),
                     isTracker: data.registration,
                     ...other,
                 },
             });
             programApi.set(data);
+
+            if (
+                !mapping.isSource &&
+                mapping.dataSource === "api" &&
+                mapping.prefetch
+            ) {
+                const data1 = await fetchRemote<any[]>(mapping.authentication);
+                dataApi.changeData(data1);
+            }
             onClose();
             stepper.next();
         }
@@ -96,12 +104,7 @@ const ProgramSelect = () => {
                 </Box>
             </Box>
 
-            <Progress
-                onClose={onClose}
-                isOpen={isOpen}
-                message="Loading Selected Program"
-                onOpen={onOpen}
-            />
+            <Progress onClose={onClose} isOpen={isOpen} db={db} />
         </Stack>
     );
 };

@@ -8,7 +8,7 @@ import {
 } from "data-import-wizard-utils";
 import { fromPairs, groupBy, map, pick } from "lodash";
 import { useQuery } from "react-query";
-import { db } from "./db";
+import { CQIDexie, initializeDatabase } from "./db";
 import { tokenApi } from "./Events";
 import { versionApi } from "./Store";
 import { convertDataToURL } from "./utils/utils";
@@ -91,7 +91,7 @@ export const useInitials = () => {
         levels: {
             resource: "filledOrganisationUnitLevels.json",
             params: {
-                fields: "id,level~rename(value),name~rename(label)",
+                fields: "id,level,name",
             },
         },
         groups: {
@@ -102,7 +102,8 @@ export const useInitials = () => {
         },
     };
 
-    return useQuery<boolean, Error>(["initials"], async () => {
+    return useQuery<CQIDexie, Error>(["initials"], async () => {
+        const db = await initializeDatabase();
         const {
             info: { version },
             organisationUnits: { organisationUnits },
@@ -121,11 +122,21 @@ export const useInitials = () => {
             };
         });
 
-        await db.organisations.bulkPut(availableUnits);
-        await db.levels.bulkPut(organisationUnitLevels);
-        await db.groups.bulkPut(organisationUnitGroups);
         versionApi.set(Number(versionNumbers[1]));
-        return true;
+        await db.levels.clear();
+        await db.groups.clear();
+        await db.organisations.clear();
+
+        await db.organisations.bulkPut(availableUnits);
+        await db.levels.bulkPut(
+            organisationUnitLevels.map((a: any) => ({
+                id: a.id,
+                label: a.name,
+                value: a.level,
+            })),
+        );
+        await db.groups.bulkPut(organisationUnitGroups);
+        return db;
     });
 };
 export const useNamespace = <IData>(namespace: string) => {
@@ -214,7 +225,6 @@ export const getDHIS2Resource = async <T>({
                 params,
             },
         });
-
         return data as T;
     }
     if (auth && resource) {
@@ -293,39 +303,22 @@ export const usePrograms = (
     searchQuery = "",
 ) => {
     const engine = useDataEngine();
-    let params: { [key: string]: any } = {
-        page,
-        pageSize,
-        fields: "id,name,displayName,lastUpdated,programType",
-        order: "name:ASC",
-    };
-    let parameters = [params];
+    const search = new URLSearchParams();
+
+    search.append("fields", "id,name,displayName,lastUpdated,programType");
+    search.append("order", "name:ASC");
+    search.append("page", page.toString());
+    search.append("pageSize", pageSize.toString());
+
     if (searchQuery !== "") {
-        parameters = [
-            ...parameters,
-            {
-                param: "filter",
-                value: `name:ilike:${searchQuery}`,
-            },
-            {
-                param: "filter",
-                value: `code:like:${searchQuery}`,
-            },
-            {
-                param: "filter",
-                value: `id:like:${searchQuery}`,
-            },
-            {
-                param: "rootJunction",
-                value: "OR",
-            },
-        ];
+        search.append("filter", `name:ilike:${searchQuery}`);
+        search.append("filter", `code:like:${searchQuery}`);
+        search.append("filter", `id:like:${searchQuery}`);
+        search.append("rootJunction", "OR");
     }
-    const stringParams = convertDataToURL(parameters);
     const programsQuery = {
         data: {
-            resource: `programs.json?${stringParams}`,
-            params: params,
+            resource: `programs.json?${search.toString()}`,
         },
     };
 

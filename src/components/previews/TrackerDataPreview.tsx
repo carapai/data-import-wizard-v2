@@ -171,23 +171,23 @@ export default function TrackerDataPreview() {
 
     const conflictColumns = useMemo<ColumnsType<any>>(
         () =>
-            Object.keys(processed.conflicts?.[0] ?? {}).map((a) => ({
+            Object.keys(processed.dhis2.conflicts?.[0] ?? {}).map((a) => ({
                 title: a,
                 key: a,
                 render: (_, record) => allNames[record[a]] || record[a],
             })),
-        [Object.keys(processed.conflicts?.[0] ?? {})],
+        [Object.keys(processed.dhis2.conflicts?.[0] ?? {})],
     );
     const errorColumns = useMemo<ColumnsType<any>>(
         () =>
-            Object.keys(processed.errors?.[0] ?? {})
+            Object.keys(processed.dhis2.errors?.[0] ?? {})
                 .filter((i) => i !== "id")
                 .map((a) => ({
                     title: a,
                     render: (_, record) => allNames[record[a]] || record[a],
                     key: a,
                 })),
-        [Object.keys(processed.errors?.[0] ?? {})],
+        [Object.keys(processed.dhis2.errors?.[0] ?? {})],
     );
 
     return (
@@ -196,14 +196,16 @@ export default function TrackerDataPreview() {
                 <Tab>
                     <Text fontSize="18px">New Entities</Text>
                     <Superscript
-                        value={processed.trackedEntityInstances?.length || 0}
+                        value={
+                            processed.dhis2.trackedEntityInstances?.length || 0
+                        }
                         bg="blue.500"
                     />
                 </Tab>
                 <Tab>
                     <Text>New Enrollments</Text>
                     <Superscript
-                        value={processed.enrollments?.length || 0}
+                        value={processed.dhis2.enrollments?.length || 0}
                         bg="blue.500"
                     />
                 </Tab>
@@ -211,7 +213,7 @@ export default function TrackerDataPreview() {
                 <Tab>
                     <Text>New Events</Text>
                     <Superscript
-                        value={processed.events?.length || 0}
+                        value={processed.dhis2.events?.length || 0}
                         bg="blue.500"
                     />
                 </Tab>
@@ -219,7 +221,8 @@ export default function TrackerDataPreview() {
                     <Text>Entity Updates</Text>
                     <Superscript
                         value={
-                            processed.trackedEntityInstanceUpdates?.length || 0
+                            processed.dhis2.trackedEntityInstanceUpdates
+                                ?.length || 0
                         }
                         bg="blue.500"
                     />
@@ -227,28 +230,28 @@ export default function TrackerDataPreview() {
                 <Tab>
                     <Text>Enrollment Updates</Text>
                     <Superscript
-                        value={processed.enrollmentUpdates?.length || 0}
+                        value={processed.dhis2.enrollmentUpdates?.length || 0}
                         bg="blue.500"
                     />
                 </Tab>
                 <Tab>
                     <Text>Events Updates</Text>
                     <Superscript
-                        value={processed.eventUpdates?.length || 0}
+                        value={processed.dhis2.eventUpdates?.length || 0}
                         bg="blue.500"
                     />
                 </Tab>
                 <Tab>
                     <Text>Conflicts</Text>
                     <Superscript
-                        value={processed.conflicts?.length || 0}
+                        value={processed.dhis2.conflicts?.length || 0}
                         bg="blue.500"
                     />
                 </Tab>
                 <Tab>
                     <Text>Errors</Text>
                     <Superscript
-                        value={processed.errors?.length || 0}
+                        value={processed.dhis2.errors.length}
                         bg="blue.500"
                     />
                 </Tab>
@@ -260,7 +263,7 @@ export default function TrackerDataPreview() {
                 <TabPanel>
                     <Table
                         columns={instanceColumns}
-                        dataSource={processed.trackedEntityInstances}
+                        dataSource={processed.dhis2.trackedEntityInstances}
                         rowKey="trackedEntityInstance"
                         expandable={{
                             expandedRowRender: (record) => (
@@ -277,7 +280,7 @@ export default function TrackerDataPreview() {
                 <TabPanel>
                     <Table
                         columns={enrollmentColumns}
-                        dataSource={processed.enrollments}
+                        dataSource={processed.dhis2.enrollments}
                         rowKey="enrollment"
                         expandable={{
                             expandedRowRender: (record) => (
@@ -294,7 +297,7 @@ export default function TrackerDataPreview() {
                 <TabPanel>
                     <Table
                         columns={eventColumns}
-                        dataSource={processed.events}
+                        dataSource={processed.dhis2.events}
                         rowKey="event"
                         expandable={{
                             expandedRowRender: (record) => (
@@ -311,7 +314,9 @@ export default function TrackerDataPreview() {
                 <TabPanel>
                     <Table
                         columns={instanceColumns}
-                        dataSource={processed.trackedEntityInstanceUpdates}
+                        dataSource={
+                            processed.dhis2.trackedEntityInstanceUpdates
+                        }
                         rowKey="trackedEntityInstance"
                         expandable={{
                             expandedRowRender: (record) => (
@@ -328,7 +333,7 @@ export default function TrackerDataPreview() {
                 <TabPanel>
                     <Table
                         columns={enrollmentColumns}
-                        dataSource={processed.enrollmentUpdates}
+                        dataSource={processed.dhis2.enrollmentUpdates}
                         rowKey="enrollment"
                         expandable={{
                             expandedRowRender: (record) => (
@@ -345,7 +350,7 @@ export default function TrackerDataPreview() {
                 <TabPanel>
                     <Table
                         columns={eventColumns}
-                        dataSource={processed.eventUpdates}
+                        dataSource={processed.dhis2.eventUpdates}
                         rowKey="event"
                         expandable={{
                             expandedRowRender: (record) => (
@@ -362,15 +367,15 @@ export default function TrackerDataPreview() {
                 <TabPanel>
                     <Table
                         columns={conflictColumns}
-                        dataSource={processed.conflicts}
-                        rowKey="id"
+                        dataSource={processed.dhis2.conflicts}
+                        rowKey={(r) => `${r.id}-${r.uniqueKey}-${r.value}`}
                     />
                 </TabPanel>
                 <TabPanel>
                     <Table
                         columns={errorColumns}
-                        dataSource={processed.errors}
-                        rowKey="id"
+                        dataSource={processed.dhis2.errors}
+                        rowKey={(r) => `${r.id}-${r.uniqueKey}-${r.value}`}
                     />
                 </TabPanel>
             </TabPanels>

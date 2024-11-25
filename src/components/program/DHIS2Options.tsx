@@ -1,6 +1,4 @@
-import { Box, Checkbox, Stack, Text } from "@chakra-ui/react";
-import { GroupBase, Select } from "chakra-react-select";
-import { Option } from "data-import-wizard-utils";
+import { Checkbox, Stack } from "@chakra-ui/react";
 import { useStore } from "effector-react";
 import { getOr } from "lodash/fp";
 import { ChangeEvent } from "react";

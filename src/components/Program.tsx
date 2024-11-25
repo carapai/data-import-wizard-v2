@@ -5,6 +5,7 @@ import { Option, Step } from "data-import-wizard-utils";
 import { useStore } from "effector-react";
 import { LocationGenerics } from "../Interfaces";
 
+import { CQIDexie } from "../db";
 import { activeStepsApi, mappingApi, processor } from "../Events";
 import {
     $action,
@@ -23,7 +24,6 @@ import {
     $otherName,
     $prevGoData,
     $processed,
-    $processedGoDataData,
     $program,
     $programStageMapping,
     $programTypes,
@@ -33,11 +33,13 @@ import {
     actionApi,
     stepper,
 } from "../Store";
-import { saveProgramMapping } from "../utils/utils";
+import { saveMapping } from "../utils/utils";
+import DataPreview from "./DataPreview";
 import ImportExportOptions from "./ImportExportOptions";
 import MappingDetails from "./MappingDetails";
 import OrganisationUnitMapping from "./OrganisationUnitMapping";
 import AttributeMapping from "./program/AttributeMapping";
+import Columns from "./program/Columns";
 import EnrollmentMapping from "./program/EnrollmentMapping";
 import EventMapping from "./program/EventMapping";
 import { OtherSystemMapping } from "./program/OtherSystemMapping";
@@ -47,7 +49,6 @@ import RemoteOutbreaks from "./RemoteOutbreak";
 import RemoteProgramSelect from "./RemoteProgramSelect";
 import StepperButtons from "./StepperButtons";
 import StepsDisplay from "./StepsDisplay";
-import DataPreview from "./DataPreview";
 
 const importTypes: Option[] = [
     { value: "dhis2-program", label: "dhis2-program" },
@@ -59,104 +60,121 @@ const importTypes: Option[] = [
     { value: "fhir", label: "fhir" },
 ];
 
-const Program = () => {
+const Program = ({ db }: { db: CQIDexie }) => {
     const toast = useToast();
     const activeStep = useStore($steps);
     const disabled = useStore($disabled);
-    const programMapping = useStore($mapping);
-    const organisationUnitMapping = useStore($organisationUnitMapping);
-    const attributeMapping = useStore($attributeMapping);
-    const programStageMapping = useStore($programStageMapping);
-    const optionMapping = useStore($optionMapping);
-    const enrollmentMapping = useStore($enrollmentMapping);
+    const mapping = useStore($mapping);
     const name = useStore($name);
     const otherName = useStore($otherName);
     const action = useStore($action);
     const engine = useDataEngine();
     const names = useStore($names);
+
+    const optionMapping = useStore($optionMapping);
+    const organisationUnitMapping = useStore($organisationUnitMapping);
+    const enrollmentMapping = useStore($enrollmentMapping);
+    const attributeMapping = useStore($attributeMapping);
+    const programStageMapping = useStore($programStageMapping);
     const navigate = useNavigate<LocationGenerics>();
 
     const steps: Step[] = [
         {
             label: "Mapping Details",
-            content: <MappingDetails importTypes={importTypes} />,
+            content: <MappingDetails importTypes={importTypes} db={db} />,
             id: 2,
             nextLabel: "Next Step",
             lastLabel: "Go to Mappings",
         },
         {
             label: `${name} Program`,
-            content: <ProgramSelect />,
+            content: <ProgramSelect db={db} />,
             nextLabel: "Next Step",
             id: 3,
             lastLabel: "Go to Mappings",
         },
         {
             label: "Select Outbreak",
-            content: <RemoteOutbreaks />,
+            content: <RemoteOutbreaks db={db} />,
             nextLabel: "Next Step",
             id: 5,
             lastLabel: "Go to Mappings",
         },
         {
             label: `${otherName} Program`,
-            content: <RemoteProgramSelect />,
+            content: <RemoteProgramSelect db={db} />,
             nextLabel: "Next Step",
             id: 6,
             lastLabel: "Go to Mappings",
         },
         {
             label: "Organisation Mapping",
-            content: <OrganisationUnitMapping />,
+            content: <OrganisationUnitMapping db={db} />,
             nextLabel: "Next Step",
             id: 7,
             lastLabel: "Go to Mappings",
         },
         {
             label: "System Mapping",
-            content: <OtherSystemMapping />,
+            content: <OtherSystemMapping db={db} />,
             nextLabel: "Next Step",
             id: 8,
             lastLabel: "Go to Mappings",
         },
         {
             label: "Attribute Mapping",
-            content: <AttributeMapping />,
+            content: <AttributeMapping db={db} />,
             nextLabel: "Next Step",
             id: 9,
             lastLabel: "Go to Mappings",
         },
         {
             label: "Enrollment Mapping",
-            content: <EnrollmentMapping />,
+            content: <EnrollmentMapping db={db} />,
             nextLabel: "Next Step",
             id: 15,
             lastLabel: "Go to Mappings",
         },
         {
             label: "Events Mapping",
-            content: <EventMapping />,
+            content: <EventMapping db={db} />,
             nextLabel: "Next Step",
             id: 10,
             lastLabel: "Go to Mappings",
         },
+
+        {
+            label: "Columns",
+            content: <Columns db={db} />,
+            nextLabel: "Next Step",
+            id: 16,
+            lastLabel: "Go to Mappings",
+        },
         {
             label: "Import/Export Options",
-            content: <ImportExportOptions />,
+            content: <ImportExportOptions db={db} />,
             nextLabel: "Next Step",
             id: 11,
             lastLabel: "Export Program",
         },
         {
             label: "Import Preview",
-            content: <DataPreview />,
-            nextLabel: "Import",
+            content: <DataPreview db={db} />,
+            nextLabel:
+                mapping.isSource &&
+                ["csv-line-list", "xlsx-line-list"].indexOf(
+                    mapping.dataSource ?? "",
+                ) !== -1
+                    ? "Download"
+                    : mapping.isSource
+                    ? "Export"
+                    : "Import",
             id: 12,
             lastLabel: "Go to Mappings",
         },
         {
             label: "Import Summary",
-            content: <ImportSummary />,
+            content: <ImportSummary db={db} />,
             nextLabel: "Go to Mappings",
             id: 13,
             lastLabel: "Go to Mappings",
@@ -164,21 +182,20 @@ const Program = () => {
     ];
 
     const activeSteps = () => {
-        const preview = programMapping.prefetch ? [12] : [];
-        const noPreview = programMapping.prefetch ? [] : [12];
+        const preview = mapping.prefetch ? [12] : [];
+        const noPreview = mapping.prefetch ? [] : [12];
         const activeSteps = steps.filter(({ id }) => {
-            if (
-                programMapping.dataSource !== "dhis2-program" &&
-                programMapping.isSource
-            ) {
-                if (programMapping.dataSource === "api") {
-                    if (programMapping.prefetch) {
-                        return [1, 2, 3, 7, 9, 10, 11, 15].indexOf(id) !== -1;
+            if (mapping.dataSource !== "dhis2-program" && mapping.isSource) {
+                if (mapping.dataSource === "api") {
+                    if (mapping.prefetch) {
+                        return (
+                            [1, 2, 3, 7, 9, 10, 11, 13, 15].indexOf(id) !== -1
+                        );
                     }
-                    return [1, 2, 3, 7, 9, 11, 15].indexOf(id) !== -1;
+                    return [1, 2, 3, 7, 9, 11, 13, 15].indexOf(id) !== -1;
                 }
-                if (programMapping.dataSource === "go-data") {
-                    if (programMapping.isSource) {
+                if (mapping.dataSource === "go-data") {
+                    if (mapping.isSource) {
                         return (
                             [1, 2, 3, 5, 7, 8, 11, 12, 13].indexOf(id) !== -1
                         );
@@ -191,30 +208,28 @@ const Program = () => {
                     }
                 }
                 if (
-                    programMapping.dataSource &&
+                    mapping.dataSource &&
                     ["json", "csv-line-list", "xlsx-line-list"].indexOf(
-                        programMapping.dataSource,
+                        mapping.dataSource,
                     ) !== -1
                 ) {
-                    return [2, 3, 11, ...preview].indexOf(id) !== -1;
+                    return [2, 3, 11, 13, 16, ...preview].indexOf(id) !== -1;
                 }
-                return [1, 2, 3, 11, ...preview].indexOf(id) !== -1;
+                return [1, 2, 3, 11, 13, ...preview].indexOf(id) !== -1;
             }
 
-            if (programMapping.dataSource === "dhis2-program") {
-                const remove = !programMapping.program?.isTracker
-                    ? [9, 15]
-                    : [];
+            if (mapping.dataSource === "dhis2-program") {
+                const remove = !mapping.program?.isTracker ? [9, 15] : [];
 
                 return [5, 8, ...remove, ...noPreview].indexOf(id) === -1;
             }
-            if (programMapping.dataSource === "go-data") {
-                if (!programMapping.program?.isTracker) {
+            if (mapping.dataSource === "go-data") {
+                if (!mapping.program?.isTracker) {
                     return [6, 8, 9, 11, 15].indexOf(id) === -1;
                 }
                 return [6, 8, 11].indexOf(id) === -1;
             }
-            const include = !programMapping.program?.isTracker ? [] : [9, 15];
+            const include = !mapping.program?.isTracker ? [] : [9, 15];
 
             return [1, 2, 3, 7, 10, 11, 12, 13, ...include].indexOf(id) !== -1;
         });
@@ -232,19 +247,20 @@ const Program = () => {
     };
 
     const onSave = async () => {
-        await saveProgramMapping({
+        await saveMapping({
             engine,
             mapping: {
-                ...programMapping,
+                ...mapping,
                 ...names,
-                type: "individual",
             },
             action,
-            organisationUnitMapping,
-            programStageMapping,
-            attributeMapping,
-            optionMapping,
-            enrollmentMapping,
+            mappings: {
+                organisationUnitMapping,
+                attributeMapping,
+                programStageMapping,
+                enrollmentMapping,
+                optionMapping,
+            },
         });
 
         actionApi.edit();
@@ -258,13 +274,12 @@ const Program = () => {
     };
     const onFinish = async () => {
         if (
-            programMapping.isSource &&
-            programMapping.dataSource &&
+            mapping.isSource &&
+            mapping.dataSource &&
             ["json", "csv-line-list", "xlsx-line-list"].indexOf(
-                programMapping.dataSource,
+                mapping.dataSource,
             ) !== -1
         ) {
-            console.log("We have finished");
         } else {
             mappingApi.reset({});
             $attributeMapping.reset();
@@ -279,7 +294,6 @@ const Program = () => {
             $goData.reset();
             $programTypes.reset();
             $tokens.reset();
-            $processedGoDataData.reset();
             $token.reset();
             $goDataOptions.reset();
             $dhis2Program.reset();

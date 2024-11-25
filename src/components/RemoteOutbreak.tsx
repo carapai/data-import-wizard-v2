@@ -11,6 +11,7 @@ import {
 import { useStore } from "effector-react";
 import { fromPairs, isEmpty } from "lodash";
 import { useEffect } from "react";
+import { CQIDexie } from "../db";
 import {
     currentSourceOptionsApi,
     goDataApi,
@@ -24,7 +25,7 @@ import { $mapping, $token, hasErrorApi, stepper } from "../Store";
 import Loader from "./Loader";
 import Progress from "./Progress";
 
-export default function RemoteOutbreaks() {
+export default function RemoteOutbreaks({ db }: { db: CQIDexie }) {
     const programMapping = useStore($mapping);
     const token = useStore($token);
     const { isOpen, onOpen, onClose } = useDisclosure();
@@ -67,19 +68,19 @@ export default function RemoteOutbreaks() {
             : { source: outbreak.name };
         onOpen();
         if (!programMapping.isSource) {
-            mappingApi.updateMany({
-                orgUnitColumn: "addresses[0].locationId",
-                customOrgUnitColumn: true,
-                program: {
-                    ...programMapping.program,
-                    createEnrollments: true,
-                    createEntities: true,
-                    updateEntities: true,
-                    incidentDateColumn: "dateOfOnset",
-                    enrollmentDateColumn: "dateOfOnset",
-                    remoteProgram: outbreak.id,
-                },
-            });
+            // mappingApi.updateMany({
+            //     orgUnitColumn: "addresses[0].locationId",
+            //     customOrgUnitColumn: true,
+            //     program: {
+            //         ...programMapping.program,
+            //         createEnrollments: true,
+            //         createEntities: true,
+            //         updateEntities: true,
+            //         incidentDateColumn: "dateOfOnset",
+            //         enrollmentDateColumn: "dateOfOnset",
+            //         remoteProgram: outbreak.id,
+            //     },
+            // });
         } else {
             mappingApi.updateMany({
                 program: {
@@ -95,14 +96,14 @@ export default function RemoteOutbreaks() {
                 ...programMapping.authentication,
                 params: { auth: { param: "access_token", value: token } },
             },
-            outbreak.locationIds
+            outbreak.locationIds,
         );
         const goDataOptions = await fetchRemote<GODataOption[]>(
             {
                 ...programMapping.authentication,
                 params: { auth: { param: "access_token", value: token } },
             },
-            "api/reference-data"
+            "api/reference-data",
         );
         const tokens = await fetchRemote<{
             languageId: string;
@@ -113,22 +114,22 @@ export default function RemoteOutbreaks() {
                 ...programMapping.authentication,
                 params: { auth: { param: "access_token", value: token } },
             },
-            "api/languages/english_us/language-tokens"
+            "api/languages/english_us/language-tokens",
         );
 
         const allTokens = fromPairs(
-            tokens.tokens.map(({ token, translation }) => [token, translation])
+            tokens.tokens.map(({ token, translation }) => [token, translation]),
         );
 
         tokensApi.set(allTokens);
         goDataOptionsApi.set(
-            goDataOptions.filter(({ deleted }) => deleted === false)
+            goDataOptions.filter(({ deleted }) => deleted === false),
         );
         if (!programMapping.isSource) {
             currentSourceOptionsApi.set(
                 goDataOptions.map(({ id }) => {
                     return { label: allTokens[id] || id, value: id };
-                })
+                }),
             );
         }
         goDataApi.set(outbreak);
@@ -136,9 +137,9 @@ export default function RemoteOutbreaks() {
             hierarchy.flat().map(({ id, name, parentInfo }) => ({
                 id,
                 name: `${[...parentInfo.map(({ name }) => name), name].join(
-                    "/"
+                    "/",
                 )}`,
-            }))
+            })),
         );
         onClose();
         stepper.next();
@@ -173,13 +174,7 @@ export default function RemoteOutbreaks() {
                     </Text>
                 </Stack>
             )}
-
-            <Progress
-                onClose={onClose}
-                isOpen={isOpen}
-                message="Loading selected outbreak"
-                onOpen={onOpen}
-            />
+            <Progress onClose={onClose} isOpen={isOpen} db={db} />
         </Stack>
     );
 }

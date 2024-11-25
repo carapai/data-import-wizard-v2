@@ -1,13 +1,12 @@
-import { useDisclosure } from "@chakra-ui/react";
 import { useDataEngine } from "@dhis2/app-runtime";
 import {
     fetchTrackedEntityInstances,
     TrackedEntityInstance,
 } from "data-import-wizard-utils";
-import { useState } from "react";
+import { CQIDexie } from "../db";
 import ProgramSelect from "./program/ProgramSelect";
 
-export default function DeleteData() {
+export default function DeleteData({ db }: { db: CQIDexie }) {
     const engine = useDataEngine();
     const withoutEnrollment = (
         trackedEntityInstances: Array<Partial<TrackedEntityInstance>>,
@@ -31,6 +30,7 @@ export default function DeleteData() {
                 trackedEntityInstances: [],
                 uniqueAttributeValues: [],
                 fields: "trackedEntityInstance",
+                setMessage: () => {},
             },
             async ({ trackedEntityInstances, pager }) => {
                 const response = await engine.mutate({
@@ -43,5 +43,5 @@ export default function DeleteData() {
         );
     };
 
-    return <ProgramSelect />;
+    return <ProgramSelect db={db} />;
 }

@@ -2,19 +2,17 @@ import { Stack, Text, useDisclosure } from "@chakra-ui/react";
 import { useDataEngine } from "@dhis2/app-runtime";
 import type { TabsProps } from "antd";
 import { Badge, Table, Tabs } from "antd";
-import { CQIDexie } from "../../db";
+import { Mapping } from "data-import-wizard-utils";
 
 import { useStore } from "effector-react";
 import { useEffect } from "react";
+import { CQIDexie } from "../../db";
 import { invalidDataApi, processedDataApi } from "../../Events";
 import {
-    $attributeMapping,
-    $attributionMapping,
     $data,
     $dataSet,
     $invalidData,
     $mapping,
-    $organisationUnitMapping,
     $processedData,
 } from "../../Store";
 import {
@@ -23,8 +21,17 @@ import {
     processAggregateData,
 } from "../../utils/utils";
 import Progress from "../Progress";
-
-export default function AggregateDataPreview({ db }: { db: CQIDexie }) {
+export default function AggregatePreviewTable({
+    mappings: { attributionMapping, dataMapping, organisationUnitMapping },
+    db,
+}: {
+    mappings: {
+        dataMapping: Mapping;
+        attributionMapping: Mapping;
+        organisationUnitMapping: Mapping;
+    };
+    db: CQIDexie;
+}) {
     const { isOpen, onOpen, onClose } = useDisclosure();
     const engine = useDataEngine();
     const data = useStore($data);
@@ -32,11 +39,7 @@ export default function AggregateDataPreview({ db }: { db: CQIDexie }) {
     const mapping = useStore($mapping);
     const processedData = useStore($processedData);
     const invalidData = useStore($invalidData);
-    const attributionMapping = useStore($attributionMapping);
-    const dataMapping = useStore($attributeMapping);
-    const organisationUnitMapping = useStore($organisationUnitMapping);
     const queryData = async () => {
-        processedDataApi.set([]);
         onOpen();
         await processAggregateData({
             mapping,
@@ -56,6 +59,7 @@ export default function AggregateDataPreview({ db }: { db: CQIDexie }) {
                 });
             },
         });
+
         onClose();
     };
 

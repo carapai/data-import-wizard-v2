@@ -1,5 +1,6 @@
 import { Stack, Text } from "@chakra-ui/react";
 import { useStore } from "effector-react";
+import { CQIDexie } from "../db";
 import { $mapping } from "../Store";
 import DHIS2AsDestinationOptions from "./import-export-options/DHIS2AsDestinationOptions";
 import DHIS2AsSourceOptions from "./import-export-options/DHIS2AsSourceOptions";
@@ -7,8 +8,10 @@ import { InitialMapping } from "./InitialMapping";
 
 export default function ImportExportOptions({
     showFileUpload,
+    db,
 }: {
     showFileUpload?: boolean;
+    db: CQIDexie;
 }) {
     const mapping = useStore($mapping);
     return (
@@ -21,6 +24,7 @@ export default function ImportExportOptions({
                     "xlsx-line-list",
                     "xlsx-tabular-data",
                     "xlsx-form",
+                    "fhir",
                 ].indexOf(String(mapping.dataSource)) !== -1 && (
                     <InitialMapping
                         isSource={mapping.isSource}
@@ -38,7 +42,7 @@ export default function ImportExportOptions({
                 "dhis2-program-indicators",
                 "manual-dhis2-program-indicators",
             ].indexOf(mapping.dataSource ?? "") !== -1 ||
-                mapping.isSource) && <DHIS2AsSourceOptions />}
+                mapping.isSource) && <DHIS2AsSourceOptions db={db} />}
         </Stack>
     );
 }

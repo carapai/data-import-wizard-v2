@@ -3,21 +3,21 @@ import { useNavigate } from "@tanstack/react-location";
 import Table, { ColumnsType } from "antd/es/table";
 import { generateUid, IMapping } from "data-import-wizard-utils";
 import dayjs from "dayjs";
+import { orderBy } from "lodash";
 import { useEffect, useState } from "react";
-import { LocationGenerics } from "../Interfaces";
+import { CQIDexie } from "../db";
 import { mappingApi } from "../Events";
+import { LocationGenerics } from "../Interfaces";
 import { useNamespace } from "../Queries";
 import { actionApi } from "../Store";
 import DropdownMenu from "./DropdownMenu";
 import FAB from "./FAB";
 import Loader from "./Loader";
 import Progress from "./Progress";
-import { orderBy } from "lodash";
 
-export default function Mappings() {
+export default function Mappings({ db }: { db: CQIDexie }) {
     const navigate = useNavigate<LocationGenerics>();
     const { onClose, onOpen, isOpen } = useDisclosure();
-    const [message, setMessage] = useState<string>("");
     let { isLoading, isSuccess, isError, error, data } =
         useNamespace<IMapping>("iw-mapping");
 
@@ -49,6 +49,11 @@ export default function Mappings() {
     }, [data?.length]);
 
     const columns: ColumnsType<Partial<IMapping>> = [
+        {
+            title: "Id",
+            dataIndex: "id",
+            key: "id",
+        },
         {
             title: "Name",
             dataIndex: "name",
@@ -87,19 +92,16 @@ export default function Mappings() {
         {
             title: "Action",
             key: "action",
-            render: (value, record, index) => {
+            render: (_, record, index) => {
                 return (
                     <DropdownMenu
                         id={record.id ?? ""}
-                        data={data ?? []}
                         onClose={onClose}
                         onOpen={onOpen}
-                        message={message}
-                        isOpen={isOpen}
-                        setMessage={setMessage}
                         afterDelete={afterDelete}
                         afterClone={afterClone}
                         name={record.name ?? ""}
+                        db={db}
                     />
                 );
             },
@@ -154,7 +156,8 @@ export default function Mappings() {
             icon: (
                 <Image src="./numeric.png" alt="aggregate" w="36px" h="36px" />
             ),
-            onClick: () => {
+            onClick: async () => {
+                await db.organisationMapping.clear();
                 actionApi.create();
                 mappingApi.reset({
                     created: dayjs().format("YYYY-MM-DD HH:mm:ss"),
@@ -177,7 +180,8 @@ export default function Mappings() {
                     h="36px"
                 />
             ),
-            onClick: () => {
+            onClick: async () => {
+                await db.organisationMapping.clear();
                 actionApi.create();
                 mappingApi.reset({
                     created: dayjs().format("YYYY-MM-DD HH:mm:ss"),
@@ -205,12 +209,7 @@ export default function Mappings() {
                     pagination={{ pageSize: 5 }}
                 />
                 <FAB actions={actions} />
-                <Progress
-                    onClose={onClose}
-                    isOpen={isOpen}
-                    message={message}
-                    onOpen={onOpen}
-                />
+                <Progress onClose={onClose} isOpen={isOpen} db={db} />
             </Stack>
         );
     }

@@ -43,7 +43,7 @@ export default function CustomColumn({
                             ?.label ?? "",
                 )
                 .join(",");
-            return `${customType} : ${values}`;
+            return `${customType} : ${values || value}`;
         }
         return "Update";
     };

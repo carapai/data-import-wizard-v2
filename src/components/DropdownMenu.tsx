@@ -15,21 +15,18 @@ import { Modal } from "antd";
 import {
     generateUid,
     getGoDataToken,
-    getPreviousAggregateMapping,
     getPreviousProgramMapping,
     IMapping,
     loadPreviousGoData,
     loadPreviousMapping,
 } from "data-import-wizard-utils";
-import { useLiveQuery } from "dexie-react-hooks";
 import { useStore } from "effector-react";
 import { isEmpty } from "lodash";
 import { ChangeEvent, useState } from "react";
 import { BiDotsVerticalRounded } from "react-icons/bi";
-import { db } from "../db";
+import { CQIDexie } from "../db";
 import {
     attributeMappingApi,
-    attributionMappingApi,
     currentSourceOptionsApi,
     dataSetApi,
     dhis2DataSetApi,
@@ -47,20 +44,7 @@ import {
 } from "../Events";
 import { LocationGenerics } from "../Interfaces";
 
-import {
-    $attributeMapping,
-    $enrollmentMapping,
-    $mapping,
-    $metadata,
-    $optionMapping,
-    $organisationUnitMapping,
-    $program,
-    $programStageMapping,
-    $version,
-    actionApi,
-    hasErrorApi,
-} from "../Store";
-import { saveProgramMapping } from "../utils/utils";
+import { $mapping, actionApi } from "../Store";
 import DataImportSummary from "./DataImportSummary";
 import DataPreview from "./DataPreview";
 import ImportExportOptions from "./ImportExportOptions";
@@ -68,51 +52,33 @@ import SwitchComponent, { Case } from "./SwitchComponent";
 
 export default function DropdownMenu({
     id,
-    data,
-    message,
-    setMessage,
-    isOpen,
     onOpen,
     onClose,
     afterDelete,
     afterClone,
     name,
+    db,
 }: {
     id: string;
-    data: any[];
-    message: string;
-    setMessage: React.Dispatch<React.SetStateAction<string>>;
-    isOpen: boolean;
     onOpen: () => void;
     onClose: () => void;
     afterDelete: (id: string) => void;
     afterClone: (mapping: Partial<IMapping>) => void;
     name: string;
+    db: CQIDexie;
 }) {
     const engine = useDataEngine();
     const toast = useToast();
     const navigate = useNavigate<LocationGenerics>();
     const [currentMapping, setCurrentMapping] = useState<string>("");
     const [currentName, setCurrentName] = useState<string>(`Copy of ${name}`);
-    const version = useStore($version);
     const [loading, setLoading] = useState(false);
     const [open, setOpen] = useState(false);
     const [optionsDialogOpen, setOptionsDialogOpen] = useState(false);
     const workingMapping = useStore($mapping);
-    const metadata = useStore($metadata);
-    const organisationUnitMapping = useStore($organisationUnitMapping);
-    const attributeMapping = useStore($attributeMapping);
-    const optionMapping = useStore($optionMapping);
-    const programStageMapping = useStore($programStageMapping);
-    const enrollmentMapping = useStore($enrollmentMapping);
-    const program = useStore($program);
     const [action, setAction] = useState<
         "configuring" | "previewing" | "uploading"
     >("configuring");
-
-    const responses = useLiveQuery(() =>
-        db.dataValueResponses.where({ completed: "false" }).toArray(),
-    );
 
     const clone = async (id: string) => {
         const previousMappings = await loadPreviousMapping(
@@ -127,10 +93,11 @@ export default function DropdownMenu({
                 attributeMapping,
                 organisationUnitMapping,
                 optionMapping,
+				attributionMapping
             } = await getPreviousProgramMapping(
                 { engine },
                 mapping,
-                (message: string) => setMessage(() => message),
+                async (message: string) => {},
             );
             const programMapping = {
                 ...mapping,
@@ -138,16 +105,16 @@ export default function DropdownMenu({
                 name: currentName,
             };
 
-            await saveProgramMapping({
-                engine,
-                mapping: programMapping,
-                action: "creating",
-                organisationUnitMapping,
-                programStageMapping,
-                attributeMapping,
-                optionMapping,
-                enrollmentMapping,
-            });
+            // await saveProgramMapping({
+            //     engine,
+            //     mapping: programMapping,
+            //     action: "creating",
+            //     organisationUnitMapping,
+            //     programStageMapping,
+            //     attributeMapping,
+            //     optionMapping,
+            //     enrollmentMapping,
+            // });
             setLoading(() => false);
             setOpen(() => false);
             afterClone(programMapping);
@@ -222,71 +189,7 @@ export default function DropdownMenu({
 
     const run = async (id: string) => {
         onOpen();
-        setMessage(() => "Loading previous mapping");
-        const previousMappings = await loadPreviousMapping(
-            { engine },
-            ["iw-mapping"],
-            id,
-        );
-        const mapping: Partial<IMapping> = previousMappings["iw-mapping"] ?? {};
-
-        if (mapping.type === "individual") {
-            const {
-                programStageMapping,
-                attributeMapping,
-                organisationUnitMapping,
-                optionMapping,
-                program,
-                remoteProgram,
-                enrollmentMapping,
-            } = await getPreviousProgramMapping(
-                { engine },
-                mapping,
-                (message: string) => setMessage(() => message),
-            );
-            programApi.set(program);
-            stageMappingApi.set(programStageMapping);
-            attributeMappingApi.set(attributeMapping);
-            ouMappingApi.set(organisationUnitMapping);
-            mappingApi.set(mapping);
-            optionMappingApi.set(optionMapping);
-            dhis2ProgramApi.set(remoteProgram);
-            enrollmentMappingApi.set(enrollmentMapping);
-
-            if (!isEmpty(program)) {
-                mappingApi.update({
-                    attribute: "program",
-                    path: "isTracker",
-                    value: program.registration,
-                });
-            }
-
-            if (!isEmpty(remoteProgram)) {
-                mappingApi.update({
-                    attribute: "program",
-                    path: "remoteIsTracker",
-                    value: remoteProgram.registration,
-                });
-            }
-        } else if (mapping.type === "aggregate") {
-            const {
-                attributeMapping,
-                attributionMapping,
-                organisationUnitMapping,
-                remoteDataSet,
-                dataSet,
-            } = await getPreviousAggregateMapping(
-                { engine },
-                mapping,
-                (message: string) => setMessage(() => message),
-            );
-            mappingApi.set(mapping);
-            attributeMappingApi.set(attributeMapping);
-            ouMappingApi.set(organisationUnitMapping);
-            attributionMappingApi.set(attributionMapping);
-            dhis2DataSetApi.set(remoteDataSet);
-            dataSetApi.set(dataSet);
-        }
+        await fetchMapping(id);
         onClose();
         setOptionsDialogOpen(() => true);
     };
@@ -308,37 +211,59 @@ export default function DropdownMenu({
 
     const loadMapping = async (id: string) => {
         onOpen();
+        const mapping = await fetchMapping(id);
+        onClose();
+        if (mapping.type === "individual") {
+            navigate({ to: "./individual" });
+        } else if (mapping.type === "aggregate") {
+            navigate({ to: "./aggregate" });
+        } else {
+            navigate({ to: "./individual" });
+        }
+    };
+
+    const fetchMapping = async (id: string) => {
         actionApi.edit();
-        setMessage(() => "Loading previous mapping");
+        await db.messages.put({
+            message: "Loading previous mapping",
+            id: 1,
+        });
         const previousMappings = await loadPreviousMapping(
             { engine },
             ["iw-mapping"],
             id,
         );
         const mapping: Partial<IMapping> = previousMappings["iw-mapping"] ?? {};
+        const {
+            programStageMapping,
+            attributeMapping,
+            organisationUnitMapping,
+            optionMapping,
+            program,
+            remoteProgram,
+            enrollmentMapping,
+            attributionMapping,
+            dataSet,
+            remoteDataSet,
+        } = await getPreviousProgramMapping(
+            { engine },
+            mapping,
+            async (message: string) => {
+                await db.messages.put({
+                    message,
+                    id: 1,
+                });
+            },
+        );
+        mappingApi.set(mapping);
+        ouMappingApi.set(organisationUnitMapping);
+        attributeMappingApi.set(attributeMapping);
+        enrollmentMappingApi.set(enrollmentMapping);
+        stageMappingApi.set(programStageMapping);
         if (mapping.type === "individual") {
-            const {
-                programStageMapping,
-                attributeMapping,
-                organisationUnitMapping,
-                optionMapping,
-                program,
-                remoteProgram,
-                enrollmentMapping,
-            } = await getPreviousProgramMapping(
-                { engine },
-                mapping,
-                (message: string) => setMessage(() => message),
-            );
             programApi.set(program);
-            stageMappingApi.set(programStageMapping);
-            attributeMappingApi.set(attributeMapping);
-            ouMappingApi.set(organisationUnitMapping);
-            mappingApi.set(mapping);
             optionMappingApi.set(optionMapping);
             dhis2ProgramApi.set(remoteProgram);
-            enrollmentMappingApi.set(enrollmentMapping);
-
             if (!isEmpty(program)) {
                 mappingApi.update({
                     attribute: "program",
@@ -354,76 +279,41 @@ export default function DropdownMenu({
                     value: remoteProgram.registration,
                 });
             }
-
             if (mapping.dataSource === "go-data") {
-                setMessage(() => "Getting Go.Data token");
-                try {
-                    const token = await getGoDataToken(mapping);
-                    setMessage(() => "Loading previous data");
-                    const {
-                        options,
-                        outbreak,
-                        tokens,
-                        goDataOptions,
-                        hierarchy,
-                    } = await loadPreviousGoData(token, mapping);
-                    goDataApi.set(outbreak);
-                    tokensApi.set(tokens);
-                    goDataOptionsApi.set(goDataOptions);
-                    currentSourceOptionsApi.set(options);
-                    remoteOrganisationsApi.set(
-                        hierarchy.flat().map(({ id, name, parentInfo }) => ({
-                            id,
-                            name: `${[
-                                ...parentInfo.map(({ name }) => name),
-                                name,
-                            ].join("/")}`,
-                        })),
-                    );
-                    onClose();
-                    navigate({ to: "./individual" });
-                } catch (error: any) {
-                    toast({
-                        title: "Something went wrong",
-                        description: error?.message ?? "",
-                        status: "error",
-                        duration: 9000,
-                        isClosable: true,
-                    });
-                    hasErrorApi.set(true);
-                    onClose();
-                }
-            } else if (mapping.dataSource === "dhis2-program") {
-                onClose();
-                navigate({ to: "./individual" });
-            } else {
-                onClose();
-                navigate({ to: "./individual" });
+                await db.messages.put({
+                    message: "Getting Go.Data token",
+                    id: 1,
+                });
+                const token = await getGoDataToken(mapping);
+                await db.messages.put({
+                    message: "Loading previous go-data data",
+                    id: 1,
+                });
+                const { options, outbreak, tokens, goDataOptions, hierarchy } =
+                    await loadPreviousGoData(token, mapping);
+                goDataApi.set(outbreak);
+                tokensApi.set(tokens);
+                goDataOptionsApi.set(goDataOptions);
+                currentSourceOptionsApi.set(options);
+                remoteOrganisationsApi.set(
+                    hierarchy.flat().map(({ id, name, parentInfo, code }) => ({
+                        id,
+                        name: `${[
+                            ...parentInfo.map(({ name }) => name),
+                            name,
+                        ].join("/")}`,
+                        code,
+                    })),
+                );
             }
         } else if (mapping.type === "aggregate") {
-            const {
-                attributeMapping,
-                organisationUnitMapping,
-                dataSet,
-                attributionMapping,
-                remoteDataSet,
-            } = await getPreviousAggregateMapping(
-                { engine },
-                mapping,
-                (message: string) => setMessage(() => message),
-            );
-            mappingApi.set(mapping);
             dataSetApi.set(dataSet);
             dhis2DataSetApi.set(remoteDataSet);
-            attributeMappingApi.set(attributeMapping);
-            ouMappingApi.set(organisationUnitMapping);
-            attributionMappingApi.set(attributionMapping);
-            onClose();
-            navigate({ to: "./aggregate" });
-        } else {
-            onClose();
-            navigate({ to: "./aggregate" });
+            await db.attributionMapping.bulkPut(
+                Object.values(attributionMapping),
+            );
         }
+        return mapping;
     };
     const deleteMapping = async (id: string) => {
         const mutation: any = {
@@ -521,13 +411,13 @@ export default function DropdownMenu({
             >
                 <SwitchComponent condition={action}>
                     <Case value="previewing">
-                        <DataPreview />
+                        <DataPreview db={db} />
                     </Case>
                     <Case value="uploading">
-                        <DataImportSummary />
+                        <DataImportSummary db={db} />
                     </Case>
                     <Case default>
-                        <ImportExportOptions showFileUpload />
+                        <ImportExportOptions showFileUpload db={db} />
                     </Case>
                 </SwitchComponent>
             </Modal>

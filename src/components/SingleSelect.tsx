@@ -22,7 +22,7 @@ export default function SingleSelect({
             <Box flex={1}>
                 <Select<Option, false, GroupBase<Option>>
                     value={metadata.sourceColumns.filter(
-                        (pt) => mapping[value].value === pt.value
+                        (pt) => mapping[value].value === pt.value,
                     )}
                     options={metadata.sourceColumns}
                     isClearable

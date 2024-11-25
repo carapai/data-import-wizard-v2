@@ -1,25 +1,27 @@
 import { Box, Checkbox, Input, Stack, Text, Textarea } from "@chakra-ui/react";
-import { GroupBase, Select, SingleValue } from "chakra-react-select";
 import { Option } from "data-import-wizard-utils";
 import { useStore } from "effector-react";
 import { ChangeEvent } from "react";
+import { CQIDexie } from "../db";
 import { mappingApi } from "../Events";
 import { $mapping } from "../Store";
 import { InitialMapping } from "./InitialMapping";
+import { Select } from "antd";
 
 export default function MappingDetails({
     importTypes,
 }: {
     importTypes: Option[];
+    db: CQIDexie;
 }) {
     const mapping = useStore($mapping);
-    const onSelect = (e: SingleValue<Option>) => {
+    const onSelect = (e: string | undefined) => {
         mappingApi.update({
             attribute: "dataSource",
-            value: e?.value,
+            value: e,
         });
-        if (e && e.value === "dhis2-program") {
-        } else if (e && e.value === "go-data") {
+        if (e && e === "dhis2-program") {
+        } else if (e && e === "go-data") {
             mappingApi.update({
                 attribute: "authentication",
                 value: true,
@@ -85,13 +87,12 @@ export default function MappingDetails({
                 </Text>
                 <Stack direction="row" w="30%" spacing="30px">
                     <Box flex={1}>
-                        <Select<Option, false, GroupBase<Option>>
-                            value={importTypes.find(
-                                (pt) => pt.value === mapping.dataSource,
-                            )}
+                        <Select
+                            style={{ width: "100%" }}
+                            value={mapping.dataSource}
                             onChange={(e) => onSelect(e)}
                             options={importTypes}
-                            isClearable
+                            allowClear
                         />
                     </Box>
                     {mapping.dataSource &&

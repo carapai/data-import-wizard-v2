@@ -1,30 +1,28 @@
 import { Box, Checkbox, Input, Stack, Text } from "@chakra-ui/react";
-import { GroupBase, Select } from "chakra-react-select";
-import { Option, RealMapping, Update } from "data-import-wizard-utils";
-import { Event } from "effector";
+import { Select } from "antd";
+import { Option } from "data-import-wizard-utils";
 import { useStore } from "effector-react";
-
 import { ChangeEvent } from "react";
 import { $mapping, $metadata } from "../Store";
 
 export default function InfoMapping({
     title,
     isChecked,
-    update,
-    column,
     value,
-    customColumn,
     title2,
     isMulti,
+    onCustomChange,
+    onValueChange,
+    children,
 }: {
     title: string;
     title2: string;
     isChecked: boolean | undefined;
-    update: Event<Update>;
-    column: keyof RealMapping;
-    customColumn: keyof RealMapping;
-    value: string | undefined | number | string[];
+    value: string | undefined;
     isMulti?: boolean;
+    onCustomChange: (value: boolean | undefined) => void;
+    onValueChange: (value: string | undefined) => void;
+    children?: React.ReactNode;
 }) {
     const metadata = useStore($metadata);
     const mapping = useStore($mapping);
@@ -45,73 +43,80 @@ export default function InfoMapping({
                 ].indexOf(mapping.dataSource ?? "") === -1 ? (
                     <Checkbox
                         isChecked={isChecked}
-                        onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                            update({
-                                attribute: "info",
-                                key: customColumn,
-                                value: e.target.checked,
-                            })
-                        }
+                        onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                            onCustomChange(e.target.checked);
+                        }}
                     >
                         {title2}
                     </Checkbox>
                 ) : null}
-                <Box>
+                <Stack
+                    direction="row"
+                    flex={1}
+                    alignItems="center"
+                    width="100%"
+                >
                     {isChecked ? (
                         <Input
                             value={value}
-                            onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                                update({
-                                    attribute: "info",
-                                    key: column,
-                                    value: e.target.value,
-                                })
-                            }
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                                onValueChange(e.target.value);
+                            }}
+                            style={{ flex: 1 }}
                         />
                     ) : isMulti ? (
-                        <Select<Option, true, GroupBase<Option>>
-                            value={metadata.sourceColumns.filter((val) =>
-                                String(value)
-                                    .split(",")
-                                    .includes(val.value ?? ""),
-                            )}
+                        <Select
                             options={metadata.sourceColumns}
-                            isClearable
-                            isMulti
-                            placeholder="Select column"
+                            style={{ flex: 1 }}
+                            mode="multiple"
+                            value={String(value)
+                                .split(",")
+                                .filter((a) => !!a)}
+                            showSearch
+                            allowClear
+                            filterOption={(input, option) =>
+                                (option?.label ?? "")
+                                    .toLowerCase()
+                                    .includes(input.toLowerCase()) ||
+                                (option?.value ?? "")
+                                    .toLowerCase()
+                                    .includes(input.toLowerCase())
+                            }
                             onChange={(e) => {
-                                update({
-                                    attribute: "info",
-                                    key: column,
-                                    value: e
+                                onValueChange(
+                                    e
                                         .flatMap((a) => {
                                             if (a) {
-                                                return a.value;
+                                                return a;
                                             }
                                             return [];
                                         })
                                         .join(","),
-                                });
+                                );
                             }}
                         />
                     ) : (
-                        <Select<Option, false, GroupBase<Option>>
-                            value={metadata.sourceColumns.find(
-                                (val) => val.value === value,
-                            )}
+                        <Select
                             options={metadata.sourceColumns}
-                            isClearable
-                            placeholder="Select column"
-                            onChange={(e) =>
-                                update({
-                                    attribute: "info",
-                                    key: column,
-                                    value: e?.value || "",
-                                })
+                            style={{ width: "100%", flex: 1 }}
+                            value={value}
+                            showSearch
+                            filterOption={(input, option) =>
+                                (option?.label ?? "")
+                                    .toLowerCase()
+                                    .includes(input.toLowerCase()) ||
+                                (option?.value ?? "")
+                                    .toLowerCase()
+                                    .includes(input.toLowerCase())
                             }
+                            onChange={(e) => {
+                                onValueChange(e);
+                            }}
+                            allowClear
                         />
                     )}
-                </Box>
+                    {children}
+                </Stack>
             </Stack>
         </Stack>
     );

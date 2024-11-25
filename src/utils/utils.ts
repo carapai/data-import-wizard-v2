@@ -1,25 +1,52 @@
 import { ColumnsType } from "antd/es/table";
+import { saveAs } from "file-saver";
+
 import {
     AggDataValue,
     Authentication,
     convertToAggregate,
     Extraction,
+    flipMapping,
     generateUid,
     IDataSet,
     IMapping,
+    IProgram,
     Mapping,
-    MappingEvent,
     Option,
     StageMapping,
 } from "data-import-wizard-utils";
 import dayjs from "dayjs";
-import { Workbook as WB } from "exceljs";
-import { chunk, fromPairs, groupBy, orderBy, times, uniq } from "lodash";
+import { IndexableType, Table } from "dexie";
+import ExcelJS from "exceljs";
+import {
+    chunk,
+    fromPairs,
+    groupBy,
+    intersection,
+    orderBy,
+    range,
+    some,
+    times,
+    uniq,
+} from "lodash";
 import { uniqBy } from "lodash/fp";
-import { Event } from "effector";
-import { read, utils, WorkBook, WorkSheet } from "xlsx";
+import { Key } from "react";
+import { utils, WorkBook } from "xlsx";
+import { CQIDexie } from "../db";
 import { Column, Threshold } from "../Interfaces";
 import { getDHIS2Resource } from "../Queries";
+import { mediumWidth, smallestWidth } from "../constants";
+
+interface SearchMappingParams {
+    value: string;
+    label: string;
+    code: string;
+    id: string;
+    sourceOptions: Partial<Option>[];
+    mapping: Partial<IMapping>;
+    path: string;
+    isOrgUnitMapping?: boolean;
+}
 
 export function encodeToBinary(str: string): string {
     return btoa(
@@ -104,7 +131,7 @@ export const getSheetData = (
             if (cell && cell.t === "d") {
                 currentRow.push([column, dayjs(cell.v).format("YYYY-MM-DD")]);
             } else if (cell) {
-                currentRow.push([column, String(cell.v)]);
+                currentRow.push([column, String(cell.w || cell.v)]);
             } else {
                 currentRow.push([column, ""]);
             }
@@ -454,68 +481,107 @@ export function columnTree(
     }
 }
 
-export const saveProgramMapping = async ({
+export const saveMapping = async ({
     engine,
     mapping,
-    organisationUnitMapping,
-    attributeMapping,
-    optionMapping,
-    programStageMapping,
-    enrollmentMapping,
     action,
+    mappings,
 }: {
     engine: any;
     mapping: Partial<IMapping>;
-    organisationUnitMapping: Mapping;
-    attributeMapping: Mapping;
-    programStageMapping: StageMapping;
-    optionMapping: Record<string, string>;
+    mappings: Partial<{
+        organisationUnitMapping: Mapping;
+        attributeMapping: Mapping;
+        enrollmentMapping: Mapping;
+        attributionMapping: Mapping;
+        optionMapping: Record<string, string>;
+        programStageMapping: StageMapping;
+    }>;
     action: "creating" | "editing";
-    enrollmentMapping: Mapping;
 }) => {
     const type = action === "creating" ? "create" : "update";
-    const mutation: any = {
-        type,
-        resource: `dataStore/iw-mapping/${mapping.id}`,
-        data: {
-            ...mapping,
-            lastUpdated: dayjs().format("YYYY-MM-DD HH:mm:ss"),
-        },
-    };
-    const mutation2: any = {
-        type,
-        resource: `dataStore/iw-ou-mapping/${mapping.id}`,
-        data: organisationUnitMapping,
-    };
-    const mutation3: any = {
-        type,
-        resource: `dataStore/iw-attribute-mapping/${mapping.id}`,
-        data: attributeMapping,
-    };
-    const mutation4: any = {
-        type,
-        resource: `dataStore/iw-stage-mapping/${mapping.id}`,
-        data: programStageMapping,
-    };
-    const mutation5: any = {
-        type,
-        resource: `dataStore/iw-option-mapping/${mapping.id}`,
-        data: optionMapping,
-    };
-    const mutation6: any = {
-        type,
-        resource: `dataStore/iw-enrollment-mapping/${mapping.id}`,
-        data: enrollmentMapping,
-    };
+    const {
+        organisationUnitMapping,
+        attributeMapping,
+        programStageMapping,
+        enrollmentMapping,
+        attributionMapping,
+        optionMapping,
+    } = mappings;
 
-    return await Promise.all([
-        engine.mutate(mutation),
-        engine.mutate(mutation2),
-        engine.mutate(mutation3),
-        engine.mutate(mutation4),
-        engine.mutate(mutation5),
-        engine.mutate(mutation6),
-    ]);
+    let mutations: any[] = [
+        engine.mutate({
+            type,
+            resource: `dataStore/iw-mapping/${mapping.id}`,
+            data: {
+                ...mapping,
+                lastUpdated: dayjs().format("YYYY-MM-DD HH:mm:ss"),
+            },
+        }),
+    ];
+
+    if (organisationUnitMapping) {
+        mutations = mutations.concat([
+            engine.mutate({
+                type,
+                resource: `dataStore/iw-ou-mapping/${mapping.id}`,
+                data: organisationUnitMapping,
+            }),
+        ]);
+    }
+
+    if (attributionMapping) {
+        mutations = mutations.concat([
+            engine.mutate({
+                type,
+                resource: `dataStore/iw-attribution-mapping/${mapping.id}`,
+                data: attributionMapping,
+            }),
+        ]);
+    }
+
+    if (attributeMapping) {
+        mutations = mutations.concat([
+            engine.mutate({
+                type,
+                resource: `dataStore/iw-attribute-mapping/${mapping.id}`,
+                data: attributeMapping,
+            }),
+        ]);
+    }
+
+    if (mapping.type === "individual") {
+        if (programStageMapping) {
+            mutations = mutations.concat([
+                engine.mutate({
+                    type,
+                    resource: `dataStore/iw-stage-mapping/${mapping.id}`,
+                    data: programStageMapping,
+                }),
+            ]);
+        }
+
+        if (optionMapping) {
+            mutations = mutations.concat([
+                engine.mutate({
+                    type,
+                    resource: `dataStore/iw-option-mapping/${mapping.id}`,
+                    data: optionMapping,
+                }),
+            ]);
+        }
+
+        if (enrollmentMapping) {
+            mutations = mutations.concat([
+                engine.mutate({
+                    type,
+                    resource: `dataStore/iw-enrollment-mapping/${mapping.id}`,
+                    data: enrollmentMapping,
+                }),
+            ]);
+        }
+    }
+    return await Promise.all(mutations);
 };
 
 export const authentication: Partial<Authentication> =
@@ -544,16 +610,12 @@ export const defaultMapping: Partial<IMapping> = {
     type: "aggregate",
 };
 
-export const findMapped = (mapping: Mapping, source: Option[]) => {
-    return Object.entries(mapping).filter(([_, val]) => {
-        return (
-            val.value && source.find((current) => current.value === val.value)
-        );
-    }).length;
+export const findMapped = (destinationOptions: Array<Partial<Option>>) => {
+    return destinationOptions.filter(({ source }) => !!source).length;
 };
 export const isMapped = (value: any, mapping: Mapping) => {
     if (value === undefined) return false;
-    return mapping[value] && mapping[value].value;
+    return mapping[value] && mapping[value].source;
 };
 
 export const processAggregateData = async ({
@@ -571,15 +633,18 @@ export const processAggregateData = async ({
     dataMapping: Mapping;
     data: any[];
     attributionMapping: Mapping;
-    setMessage: React.Dispatch<React.SetStateAction<string>>;
+    setMessage: (message: string) => void;
     engine: any;
     dataCallback: ({
         validData,
+        invalidData,
     }: {
         validData: Array<AggDataValue>;
         invalidData: any[];
-    }) => Promise<void>;
+    }) => void;
 }) => {
+    const flippedAttribution = flipMapping(attributionMapping);
+    const flippedOrgUnits = flipMapping(organisationUnitMapping);
     if (
         [
             "xlsx-line-list",
@@ -588,13 +653,13 @@ export const processAggregateData = async ({
             "csv-line-list",
         ].indexOf(mapping.dataSource ?? "") !== -1
     ) {
-        await dataCallback(
+        dataCallback(
             convertToAggregate({
                 mapping,
-                organisationUnitMapping,
+                flippedOrgUnits,
                 dataMapping,
                 data,
-                attributionMapping,
+                flippedAttribution,
             }),
         );
     } else if (mapping.dataSource === "dhis2-data-set") {
@@ -611,33 +676,40 @@ export const processAggregateData = async ({
                         startDate: p.startDate,
                         endDate: p.endDate,
                     };
+                } else {
+                    params = {
+                        ...params,
+                        period: p.value ?? "",
+                    };
                 }
                 setMessage(
-                    () =>
-                        `Querying data orgUnit ${orgUnit} and period ${p.value}`,
+                    `Querying data orgUnit ${orgUnit} and period ${p.value}`,
                 );
-                const data = await getDHIS2Resource<any>({
-                    isCurrentDHIS2: mapping.isCurrentInstance,
-                    auth: mapping.authentication,
-                    engine,
-                    resource: "dataValueSets.json",
-                    params,
-                });
+                try {
+                    const data = await getDHIS2Resource<any>({
+                        isCurrentDHIS2: mapping.isCurrentInstance,
+                        auth: mapping.authentication,
+                        engine,
+                        resource: "dataValueSets.json",
+                        params,
+                    });
 
-                if (data.dataValues) {
-                    setMessage(
-                        () =>
+                    if (data.dataValues) {
+                        setMessage(
                             `Converting data for orgUnit ${orgUnit} and period ${p.value}`,
-                    );
-                    await dataCallback(
-                        convertToAggregate({
-                            mapping,
-                            organisationUnitMapping,
-                            dataMapping,
-                            data: data.dataValues,
-                            attributionMapping,
-                        }),
-                    );
+                        );
+                        dataCallback(
+                            convertToAggregate({
+                                mapping,
+                                flippedOrgUnits,
+                                dataMapping,
+                                data: data.dataValues,
+                                flippedAttribution,
+                            }),
+                        );
+                    }
+                } catch (error) {
+                    console.error(error);
                 }
             }
         }
@@ -647,108 +719,118 @@ export const processAggregateData = async ({
         ) !== -1
     ) {
         const allKeys = Object.values(dataMapping).flatMap((a) => {
-            if (a.value) {
-                return a.value;
+            if (a.source) {
+                return a.source;
             }
             return [];
         });
 
+        const ous =
+            mapping.dhis2SourceOptions &&
+            mapping.dhis2SourceOptions.ous &&
+            mapping.dhis2SourceOptions.ous.length > 0
+                ? `${mapping.dhis2SourceOptions.ous.join(";")};`
+                : "";
+        let page = 0;
+        const allChunks = chunk(allKeys, 10);
         if (allKeys.length > 0) {
-            for (const indicators of chunk(allKeys, 25)) {
+            for (const indicators of allChunks) {
                 setMessage(
-                    () =>
-                        `Querying data for orgUnit level ${
-                            mapping.aggregate?.indicatorGenerationLevel
-                        } and periods ${(
+                    `Querying page ${page + 1} of ${
+                        allChunks.length
+                    } indicators of ${allKeys.length}`,
+                );
+                try {
+                    const data = await getDHIS2Resource<{
+                        headers: Array<{ name: string }>;
+                        rows: string[][];
+                    }>({
+                        isCurrentDHIS2: mapping.isCurrentInstance,
+                        auth: mapping.authentication,
+                        engine,
+                        resource: `analytics.json?dimension=dx:${indicators.join(
+                            ";",
+                        )}&dimension=ou:${ous}LEVEL-${
+                            mapping.aggregate?.indicatorGenerationLevel ?? []
+                        }&dimension=pe:${(
                             mapping.dhis2SourceOptions?.period?.map(
                                 (p) => p.value,
                             ) ?? []
-                        ).join(";")} for indicators ${indicators.join(";")}`,
-                );
-                const data = await getDHIS2Resource<{
-                    headers: Array<{ name: string }>;
-                    rows: string[][];
-                }>({
-                    isCurrentDHIS2: mapping.isCurrentInstance,
-                    auth: mapping.authentication,
-                    engine,
-                    resource: `analytics.json?dimension=dx:${indicators.join(
-                        ";",
-                    )}&dimension=ou:LEVEL-${
-                        mapping.aggregate?.indicatorGenerationLevel ?? []
-                    }&dimension=pe:${(
-                        mapping.dhis2SourceOptions?.period?.map(
-                            (p) => p.value,
-                        ) ?? []
-                    ).join(";")}`,
-                });
+                        ).join(";")}`,
+                    });
+                    setMessage(
+                        `Processing page ${page + 1} of ${
+                            allChunks.length
+                        } indicators of ${allKeys.length}`,
+                    );
+                    if (data.rows && data.rows.length > 0) {
+                        const finalData = data.rows.map((row) =>
+                            fromPairs(
+                                row.map((r, index) => [
+                                    data.headers?.[index].name,
+                                    r,
+                                ]),
+                            ),
+                        );
+                        dataCallback(
+                            convertToAggregate({
+                                mapping,
+                                flippedAttribution,
+                                dataMapping,
+                                data: finalData,
+                                flippedOrgUnits,
+                            }),
+                        );
+                    }
+                } catch (error) {}
 
-                setMessage(
-                    () =>
-                        `Processing and converting data for orgUnit level ${
-                            mapping.aggregate?.indicatorGenerationLevel
-                        } and periods ${(
-                            mapping.dhis2SourceOptions?.period?.map(
-                                (p) => p.value,
-                            ) ?? []
-                        ).join(";")} for indicators ${indicators.join(";")}`,
-                );
-                if (data.rows && data.rows.length > 0) {
-                    const finalData = data.rows.map((row) =>
-                        fromPairs(
-                            row.map((r, index) => [
-                                data.headers?.[index].name,
-                                r,
-                            ]),
-                        ),
-                    );
-                    dataCallback(
-                        convertToAggregate({
-                            mapping,
-                            organisationUnitMapping,
-                            dataMapping,
-                            data: finalData,
-                            attributionMapping,
-                        }),
-                    );
-                }
+                page = page + 1;
             }
         }
     }
 };
 
-export const aggregateDataColumns: ColumnsType<AggDataValue> = [
-    {
-        title: "Data Element",
-        dataIndex: "dataElement",
-        key: "dataElement",
-    },
-    {
-        title: "Organisation",
-        dataIndex: "orgUnit",
-        key: "orgUnit",
-    },
-    {
-        title: "Period",
-        dataIndex: "period",
-        key: "period",
-    },
-    {
-        title: "Category OptionCombo",
-        dataIndex: "categoryOptionCombo",
-        key: "categoryOptionCombo",
-    },
-    {
-        title: "Attribute OptionCombo",
-        dataIndex: "attributeOptionCombo",
-        key: "attributeOptionCombo",
-    },
-    {
-        title: "Value",
-        dataIndex: "value",
-        key: "value",
-    },
-];
+export const makeAggregateColumns = (metadata: Record<string, string>) => {
+    const aggregateDataColumns: ColumnsType<AggDataValue> = [
+        {
+            title: "Data Element",
+            dataIndex: "dataElement",
+            key: "dataElement",
+            render: (dataElement) => metadata[dataElement] || dataElement,
+        },
+        {
+            title: "Organisation",
+            dataIndex: "orgUnit",
+            key: "orgUnit",
+            render: (orgUnit) => metadata[orgUnit] || orgUnit,
+        },
+        {
+            title: "Period",
+            dataIndex: "period",
+            key: "period",
+        },
+        {
+            title: "Category OptionCombo",
+            dataIndex: "categoryOptionCombo",
+            key: "categoryOptionCombo",
+            render: (categoryOptionCombo) =>
+                metadata[categoryOptionCombo] || categoryOptionCombo,
+        },
+        {
+            title: "Attribute OptionCombo",
+            dataIndex: "attributeOptionCombo",
+            key: "attributeOptionCombo",
+            render: (attributeOptionCombo) =>
+                metadata[attributeOptionCombo] || attributeOptionCombo,
+        },
+        {
+            title: "Value",
+            dataIndex: "value",
+            key: "value",
+        },
+    ];
+    return aggregateDataColumns;
+};
 
 export const invalidDataColumns = (
     invalidData: any[] | undefined,
@@ -785,89 +867,294 @@ export const findUniqueDataSetCompletions = (
 
 export const processProgramMapping = () => {};
 
+function cleanString(input: string, preserveSpaces: boolean = false): string {
+    if (preserveSpaces) {
+        return input.replace(/[^a-zA-Z0-9 ]/g, "");
+    } else {
+        return input.replace(/[^a-zA-Z0-9]/g, "");
+    }
+}
+
 export const searchMapping = ({
-    destinationCode,
-    destinationLabel,
-    destinationValue,
+    code,
+    value,
+    id,
     sourceOptions,
-}: {
-    destinationValue: string;
-    destinationLabel: string;
-    destinationCode: string;
-    sourceOptions: Option[];
-}) => {
-    let search = sourceOptions.find(({ value }) => destinationValue === value);
-    if (search === undefined) {
-        search = sourceOptions.find(
-            ({ code }) => code && code.includes(destinationCode),
-        );
-    }
-    if (search === undefined) {
-        search = sourceOptions.find(
-            ({ code }) => code && code.includes(destinationValue),
-        );
-    }
-    if (search === undefined) {
-        search = sourceOptions.find(({ label }) =>
-            label.includes(destinationValue),
-        );
-    }
-    if (search === undefined) {
-        search = sourceOptions.find(({ value }) => value === destinationLabel);
-    }
-
-    if (search === undefined) {
-        search = sourceOptions.find(({ label }) => label === destinationLabel);
-    }
-
-    if (search === undefined) {
-        search = sourceOptions.find(({ label }) => label === destinationLabel);
-    }
-
-    if (search === undefined) {
-        search = sourceOptions.find(
-            ({ code }) => code && code.includes(destinationLabel),
-        );
-    }
-    return search;
+    mapping,
+    label,
+    path,
+    isOrgUnitMapping,
+}: SearchMappingParams): Partial<Option> | undefined => {
+    return sourceOptions.find((option) => {
+        const {
+            code: code1 = "",
+            value: value1 = "",
+            label: label1 = "",
+            id: id1 = "",
+            path: path1 = "",
+        } = option;
+        if (mapping.orgUnitMapping?.matchHierarchy && isOrgUnitMapping) {
+            const sourcePath = cleanString(path1).toLowerCase();
+            const destPath = cleanString(path).toLowerCase();
+            return destPath.includes(sourcePath);
+        }
+        if (value1 && value && value === value1) return true;
+        if (code && code1 && code === code1) return true;
+        if (id && id1 && id === id1) return true;
+        return cleanString(label)
+            .toLowerCase()
+            .includes(cleanString(label1).toLowerCase());
+    });
 };
 
-export const createMapping = ({
-    destinationOptions,
-    map,
-    mapping,
-    sourceOptions,
-    onMap,
-    onUnMap,
+export const updateMapping = async ({
+    table,
+    currentValues,
 }: {
-    destinationOptions: Option[];
-    sourceOptions: Option[];
-    map: boolean;
-    mapping: Mapping;
-    onMap: (destinationValue: string, search: any) => void;
-    onUnMap: (destinationValue: string) => void;
+    table: Table<Partial<Option>, IndexableType>;
+    currentValues: Partial<Option>;
 }) => {
-    let i = 0;
-    for (const {
-        value: destinationValue = "",
-        label: destinationLabel = "",
-        code: destinationCode = "",
-    } of destinationOptions) {
-        const mapValue = mapping[destinationValue];
-        if (map && mapValue === undefined) {
-            const search = searchMapping({
-                destinationCode,
-                destinationLabel,
-                destinationValue,
-                sourceOptions,
+    if (currentValues.source) {
+        let prev = undefined;
+        if (currentValues.source && currentValues.stage) {
+            prev = await table
+                .where({
+                    source: currentValues.source,
+                    stage: currentValues.stage,
+                })
+                .first();
+        } else if (currentValues.source) {
+            prev = await table.get(currentValues.source);
+        }
+
+        if (prev) {
+            await table.put({
+                ...prev,
+                ...currentValues,
             });
-            onMap(destinationValue, search);
-        } else if (!map && destinationValue && mapValue && !mapValue.isManual) {
-            onUnMap(destinationValue);
+        } else {
+            await table.put(currentValues);
         }
-        if (i === destinationOptions.length) {
-            // onEnd();
-        }
-        i++;
+    } else if (currentValues.value && currentValues.stage) {
+        await table.delete([currentValues.stage, currentValues.value]);
+    } else if (currentValues.value) {
+        await table.delete(currentValues.value);
     }
+};
+
+export const readMappings = async (db: CQIDexie) => {
+    if (db) {
+        const unitsMapping = await db.organisationMapping.toArray();
+        const aMapping = await db.attributeMapping.toArray();
+        const enrollment = await db.enrollmentMapping.toArray();
+        const stageMapping = await db.programStageMapping.toArray();
+        const attribution = await db.attributionMapping.toArray();
+        const options = await db.optionsMapping.toArray();
+
+        const attributionMapping =
+            attribution?.reduce<Mapping>((a, b) => {
+                if (b.value) {
+                    a[b.value] = b;
+                }
+                return a;
+            }, {}) ?? {};
+        const optionsMapping =
+            options?.reduce<Mapping>((a, b) => {
+                if (b.value) {
+                    a[b.value] = b;
+                }
+                return a;
+            }, {}) ?? {};
+
+        const organisationUnitMapping =
+            unitsMapping?.reduce<Mapping>((a, b) => {
+                if (b.value) {
+                    a[b.value] = b;
+                }
+                return a;
+            }, {}) ?? {};
+
+        const attributeMapping =
+            aMapping?.reduce<Mapping>((a, b) => {
+                if (b.value) {
+                    a[b.value] = b;
+                }
+                return a;
+            }, {}) ?? {};
+        const enrollmentMapping =
+            enrollment?.reduce<Mapping>((a, b) => {
+                if (b.value) {
+                    a[b.value] = b;
+                }
+                return a;
+            }, {}) ?? {};
+        const programStageMapping =
+            stageMapping?.reduce<StageMapping>((a, b) => {
+                if (b.stage && b.value && a[b.stage]) {
+                    a[b.stage][b.value] = b;
+                } else if (b.stage && b.value) {
+                    a[b.stage] = {
+                        [b.value]: b,
+                    };
+                }
+                return a;
+            }, {}) ?? {};
+
+        return {
+            attributeMapping,
+            organisationUnitMapping,
+            enrollmentMapping,
+            programStageMapping,
+            optionsMapping,
+            attributionMapping,
+        };
+    }
+
+    return {
+        attributeMapping: {},
+        organisationUnitMapping: {},
+        enrollmentMapping: {},
+        programStageMapping: {},
+        optionsMapping: {},
+        attributionMapping: {},
+    };
+};
+
+export const generateExcelData = async (
+    program: Partial<IProgram>,
+    columns: Key[],
+    stagesMax: Record<string, number>,
+    processedData: any[],
+    levels: Option[],
+) => {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Sheet 1");
+    let createdColumns: any[] = [];
+    program.programTrackedEntityAttributes?.forEach(
+        ({ trackedEntityAttribute: { id, name, displayFormName } }) => {
+            if (columns.includes(id)) {
+                createdColumns.push({
+                    header: displayFormName || name,
+                    key: id,
+                });
+            }
+        },
+    );
+    levels.forEach((level) => {
+        if (level.value && level.label && columns.includes(level.value)) {
+            createdColumns.push({
+                header: level.label,
+                key: level.value,
+            });
+        }
+    });
+    program.programStages?.forEach(
+        ({
+            id: stageId,
+            name: stageName,
+            programStageDataElements,
+            repeatable,
+        }) => {
+            const available = intersection(
+                programStageDataElements.map(
+                    (a) => `${stageId}-${a.dataElement.id}`,
+                ),
+                columns,
+            );
+            if (available.length > 0) {
+                if (repeatable) {
+                    range(stagesMax[stageId]).forEach((i) => {
+                        [
+                            {
+                                allowFutureDate: false,
+                                compulsory: true,
+                                dataElement: {
+                                    code: "eventDate",
+                                    id: "eventDate",
+                                    name: "Event Date",
+                                    displayName: "eventDate",
+                                    optionSetValue: false,
+                                    zeroIsSignificant: false,
+                                    valueType: "",
+                                    optionSet: {
+                                        id: "",
+                                        name: "",
+                                        options: [
+                                            {
+                                                code: "",
+                                                id: "",
+                                                name: "",
+                                            },
+                                        ],
+                                    },
+                                },
+                            },
+                            ...programStageDataElements,
+                        ].forEach(({ dataElement: { id, name } }) => {
+                            if (columns.includes(`${stageId}-${id}`)) {
+                                createdColumns.push({
+                                    header: `${stageName}.${i}.${name}`,
+                                    key: `0-${stageId}-${id}-${i}`,
+                                });
+                            }
+                        });
+                    });
+                } else {
+                    [
+                        {
+                            allowFutureDate: false,
+                            compulsory: true,
+                            dataElement: {
+                                code: "eventDate",
+                                id: "eventDate",
+                                name: "Event Date",
+                                displayName: "eventDate",
+                                optionSetValue: false,
+                                zeroIsSignificant: false,
+                                valueType: "",
+                                optionSet: {
+                                    id: "",
+                                    name: "",
+                                    options: [
+                                        {
+                                            code: "",
+                                            id: "",
+                                            name: "",
+                                        },
+                                    ],
+                                },
+                            },
+                        },
+                        ...programStageDataElements,
+                    ].forEach(({ dataElement: { id, name } }) => {
+                        if (columns.includes(`${stageId}-${id}`)) {
+                            createdColumns.push({
+                                header: `${stageName}.0.${name}`,
+                                key: `0-${stageId}-${id}-0`,
+                            });
+                        }
+                    });
+                }
+            }
+        },
+    );
+
+    worksheet.columns = createdColumns;
+    processedData.forEach((row) => worksheet.addRow(row));
+    const buffer = await workbook.xlsx.writeBuffer();
+    // Save the file
+    const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    saveAs(blob, `export.xlsx`);
+};
+
+export const enrollmentOptions: Option[] = [
+    { label: "Enrollment Date", value: "enrollmentDate" },
+    { label: "Enrollment Id", value: "enrollment" },
+];
+
+export const calculateWidth = (width: number) => {
+	const allSmall = smallestWidth * 5;
+    return width - allSmall - mediumWidth - 170;
 };

@@ -2,7 +2,7 @@ import { Checkbox, Stack } from "@chakra-ui/react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useStore } from "effector-react";
 import { ChangeEvent } from "react";
-import { db } from "../../db";
+import { CQIDexie } from "../../db";
 
 import { dataApi, mappingApi } from "../../Events";
 import { $configList, $mapping, $metadata, $workbook } from "../../Store";
@@ -10,7 +10,7 @@ import { generateData } from "../../utils/utils";
 import NumberProperty from "../mapping-fields/NumberProperty";
 import SelectField from "../mapping-fields/SelectProperty";
 
-export default function Configuration() {
+export default function Configuration({ db }: { db: CQIDexie }) {
     const mapping = useStore($mapping);
     const metadata = useStore($metadata);
     const configList = useStore($configList);
@@ -31,8 +31,7 @@ export default function Configuration() {
                             const actual = generateData(
                                 mapping,
                                 workbook,
-                                mapping.sheet,
-                                "json"
+                                "json",
                             );
                             dataApi.changeData(actual);
                         }
@@ -52,8 +51,7 @@ export default function Configuration() {
                             const actual = generateData(
                                 mapping,
                                 workbook,
-                                mapping.sheet,
-                                "json"
+                                "json",
                             );
                             dataApi.changeData(actual);
                         }
@@ -168,7 +166,7 @@ export default function Configuration() {
                                         flex={1}
                                         key={value}
                                     />
-                                )
+                                ),
                             )}
                         </Stack>
                     )}

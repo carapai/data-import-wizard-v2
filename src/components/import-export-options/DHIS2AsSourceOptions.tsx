@@ -1,14 +1,18 @@
 import { Checkbox, Input, Stack, Text } from "@chakra-ui/react";
+import { Tabs } from "antd";
 import { DisabledPeriod } from "data-import-wizard-utils";
 import { useStore } from "effector-react";
 import { getOr } from "lodash/fp";
 import { ChangeEvent, useEffect } from "react";
+import { CQIDexie } from "../../db";
 import { mappingApi } from "../../Events";
 import { $mapping } from "../../Store";
 import OUTree from "../OuTree";
 import PeriodPicker from "../PeriodPicker";
 import SwitchComponent, { Case } from "../SwitchComponent";
-export default function DHIS2AsSourceOptions() {
+import AttributeFilters from "./AttributeFilters";
+import DataElementFilters from "./DataElementFilters";
+export default function DHIS2AsSourceOptions({ db }: { db: CQIDexie }) {
     const mapping = useStore($mapping);
     const findDisabled = (): DisabledPeriod[] => {
         if (mapping.dataSource === "dhis2-data-set") {
@@ -68,145 +72,145 @@ export default function DHIS2AsSourceOptions() {
                     Preview
                 </Checkbox>
             </Stack>
-            {/* <SwitchComponent condition={mapping.dataSource}>
-                <Case value="dhis2-program">
-                    <Stack>
-                        <Text>Specific program stage</Text>
-                        <Box>
-                            <Select<Option, true, GroupBase<Option>>
-                                options={metadata.sourceStages}
-                                isClearable
-                                isMulti
-                                value={metadata.sourceStages.filter((value) => {
-                                    const available =
-                                        mapping.dhis2SourceOptions
-                                            ?.programStage ?? [];
-                                    return (
-                                        available.indexOf(value?.value!) !== -1
-                                    );
-                                })}
-                                onChange={(e) =>
+
+            <Tabs
+                items={[
+                    {
+                        key: "1",
+                        label: "Period",
+                        children: (
+                            <Stack>
+                                <PeriodPicker
+                                    selectedPeriods={
+                                        mapping.dhis2SourceOptions?.period ?? []
+                                    }
+                                    disabled={findDisabled()}
+                                    active={findActive()}
+                                    onChange={(periods) =>
+                                        mappingApi.update({
+                                            attribute: "dhis2SourceOptions",
+                                            path: "period",
+                                            value: periods,
+                                        })
+                                    }
+                                />
+
+                                <SwitchComponent
+                                    condition={
+                                        mapping.dataSource ===
+                                            "dhis2-program" || mapping.isSource
+                                    }
+                                >
+                                    <Case value={true}>
+                                        <Stack>
+                                            <Text>Period Applies To</Text>
+                                            <Stack spacing={5} direction="row">
+                                                <Checkbox
+                                                    isChecked={
+                                                        mapping
+                                                            .dhis2SourceOptions
+                                                            ?.searchPeriod ===
+                                                        "enrollmentDate"
+                                                    }
+                                                    onChange={(
+                                                        e: ChangeEvent<HTMLInputElement>,
+                                                    ) =>
+                                                        mappingApi.update({
+                                                            attribute:
+                                                                "dhis2SourceOptions",
+                                                            path: "searchPeriod",
+                                                            value: "enrollmentDate",
+                                                        })
+                                                    }
+                                                >
+                                                    Enrollment Date
+                                                </Checkbox>
+                                                <Checkbox
+                                                    isChecked={
+                                                        mapping
+                                                            .dhis2SourceOptions
+                                                            ?.searchPeriod ===
+                                                        "eventDate"
+                                                    }
+                                                    isDisabled={
+                                                        !mapping
+                                                            .dhis2SourceOptions
+                                                            ?.programStages
+                                                            ?.length
+                                                    }
+                                                    onChange={(
+                                                        e: ChangeEvent<HTMLInputElement>,
+                                                    ) =>
+                                                        mappingApi.update({
+                                                            attribute:
+                                                                "dhis2SourceOptions",
+                                                            path: "searchPeriod",
+                                                            value: "eventDate",
+                                                        })
+                                                    }
+                                                >
+                                                    Event Date
+                                                </Checkbox>
+                                            </Stack>
+                                        </Stack>
+                                    </Case>
+                                    <Case default>{null}</Case>
+                                </SwitchComponent>
+                            </Stack>
+                        ),
+                    },
+                    {
+                        key: "2",
+                        label: "Organisation",
+                        children: (
+                            <OUTree
+                                value={mapping.dhis2SourceOptions?.ous ?? []}
+                                onChange={(ous) =>
                                     mappingApi.update({
                                         attribute: "dhis2SourceOptions",
-                                        path: "programStage",
-                                        value: e.map((ee) => ee.value),
+                                        path: "ous",
+                                        value: ous,
                                     })
                                 }
+                                db={db}
                             />
-                        </Box>
-                    </Stack>
-                </Case>
-                <Case default>{null}</Case>
-            </SwitchComponent> */}
-            <Stack>
-                <Text>Period</Text>
-                <PeriodPicker
-                    selectedPeriods={mapping.dhis2SourceOptions?.period ?? []}
-                    disabled={findDisabled()}
-                    active={findActive()}
-                    onChange={(periods) =>
-                        mappingApi.update({
-                            attribute: "dhis2SourceOptions",
-                            path: "period",
-                            value: periods,
-                        })
-                    }
-                />
-            </Stack>
-
-            <SwitchComponent
-                condition={
-                    mapping.dataSource === "dhis2-program" || mapping.isSource
-                }
-            >
-                <Case value={true}>
-                    <Stack>
-                        <Text>Period Applies To</Text>
-                        <Stack spacing={5} direction="row">
-                            <Checkbox
-                                isChecked={
-                                    mapping.dhis2SourceOptions?.searchPeriod ===
-                                    "enrollmentDate"
-                                }
-                                onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                                    mappingApi.update({
-                                        attribute: "dhis2SourceOptions",
-                                        path: "searchPeriod",
-                                        value: "enrollmentDate",
-                                    })
-                                }
-                            >
-                                Enrollment Date
-                            </Checkbox>
-                            <Checkbox
-                                isChecked={
-                                    mapping.dhis2SourceOptions?.searchPeriod ===
-                                    "eventDate"
-                                }
-                                isDisabled={
-                                    !mapping.dhis2SourceOptions?.programStage
-                                        ?.length
-                                }
-                                onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                                    mappingApi.update({
-                                        attribute: "dhis2SourceOptions",
-                                        path: "searchPeriod",
-                                        value: "eventDate",
-                                    })
-                                }
-                            >
-                                Event Date
-                            </Checkbox>
-                        </Stack>
-                    </Stack>
-                </Case>
-                <Case default>{null}</Case>
-            </SwitchComponent>
-            <Stack>
-                <Text>Organisation</Text>
-                <OUTree
-                    value={mapping.dhis2SourceOptions?.ous ?? []}
-                    onChange={(ous) =>
-                        mappingApi.update({
-                            attribute: "dhis2SourceOptions",
-                            path: "ous",
-                            value: ous,
-                        })
-                    }
-                />
-            </Stack>
-
-            {mapping.program?.isTracker && (
-                <Stack>
-                    <Text>Tracked Entities</Text>
-                    <Input
-                        value={
-                            mapping.dhis2SourceOptions?.trackedEntityInstance ??
-                            ""
-                        }
-                        onChange={(value) =>
-                            mappingApi.update({
-                                attribute: "dhis2SourceOptions",
-                                path: "trackedEntityInstance",
-                                value: value.target.value,
-                            })
-                        }
-                    />
-                </Stack>
-            )}
-
-            {/* <Checkbox
-                isChecked={mapping.dhis2SourceOptions?.useAnalytics}
-                onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                    mappingApi.update({
-                        attribute: "dhis2SourceOptions",
-                        path: "useAnalytics",
-                        value: e.target.checked,
-                    })
-                }
-            >
-                Use Analytics Aggregate
-            </Checkbox> */}
+                        ),
+                    },
+                    {
+                        key: "3",
+                        label: "Specific Tracked Entities",
+                        children: (
+                            <>
+                                {mapping.program?.isTracker && (
+                                    <Input
+                                        value={
+                                            mapping.dhis2SourceOptions
+                                                ?.trackedEntityInstance ?? ""
+                                        }
+                                        onChange={(value) =>
+                                            mappingApi.update({
+                                                attribute: "dhis2SourceOptions",
+                                                path: "trackedEntityInstance",
+                                                value: value.target.value,
+                                            })
+                                        }
+                                    />
+                                )}
+                            </>
+                        ),
+                    },
+                    {
+                        key: "4",
+                        label: "Attribute Filters",
+                        children: <AttributeFilters />,
+                    },
+                    {
+                        key: "5",
+                        label: "Data Element Filters",
+                        children: <DataElementFilters />,
+                    },
+                ]}
+            />
         </Stack>
     );
 }

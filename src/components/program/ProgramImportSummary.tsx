@@ -5,36 +5,31 @@ import type { ColumnsType } from "antd/es/table";
 import { AxiosInstance } from "axios";
 import {
     AggConflict,
-    convertToGoData,
-    fetchGoDataData,
-    fetchTrackedEntityInstances,
+    convert,
     generateUid,
     groupGoData4Insert,
+    IMapping,
     insertTrackerData,
     insertTrackerData38,
-    postRemote,
-    flattenEntitiesByEvents,
     Processed,
-    processInstances,
+    Option,
 } from "data-import-wizard-utils";
 import { useStore } from "effector-react";
 import { useEffect, useState } from "react";
 import {
-    $additionalParams,
     $attributeMapping,
+    $data,
     $enrollmentMapping,
     $goData,
+    $goDataOptions,
     $mapping,
+    $metadata,
     $optionMapping,
     $organisationUnitMapping,
-    $otherProcessed,
     $prevGoData,
     $processed,
-    $processedGoDataData,
     $program,
     $programStageMapping,
-    $programStageUniqueElements,
-    $programUniqAttributes,
     $remoteAPI,
     $tokens,
     $version,
@@ -42,7 +37,9 @@ import {
 import Progress from "../Progress";
 
 import { useLiveQuery } from "dexie-react-hooks";
-import { db } from "../../db";
+import { maxBy } from "lodash";
+import { CQIDexie } from "../../db";
+import { enrollmentOptions, generateExcelData } from "../../utils/utils";
 
 type TrackerAddition = {
     id: string;
@@ -61,36 +58,37 @@ type TrackerAddition = {
     }>;
 };
 
-export default function ProgramImportSummary() {
+export default function ProgramImportSummary({ db }: { db: CQIDexie }) {
     const engine = useDataEngine();
     const version = useStore($version);
     const { isOpen, onOpen, onClose } = useDisclosure();
     const program = useStore($program);
     const [count, setCount] = useState(0);
-    const programStageMapping = useStore($programStageMapping);
     const mapping = useStore($mapping);
-    const attributeMapping = useStore($attributeMapping);
-    const programUniqAttributes = useStore($programUniqAttributes);
-    const programStageUniqueElements = useStore($programStageUniqueElements);
     const optionMapping = useStore($optionMapping);
     const tokens = useStore($tokens);
-    const otherProcessed = useStore($otherProcessed);
-    const processedGoDataData = useStore($processedGoDataData);
     const prevGoData = useStore($prevGoData);
     const goData = useStore($goData);
-    const organisationUnitMapping = useStore($organisationUnitMapping);
     const processed = useStore($processed);
     const remoteAPI = useStore($remoteAPI);
-    const enrollmentMapping = useStore($enrollmentMapping);
-    const additionalParams = useStore($additionalParams);
-    const [message, setMessage] = useState<string>("");
+    const referenceData = useStore($goDataOptions);
     const [inserted, setInserted] = useState<any[]>([]);
     const [errored, setErrored] = useState<any[]>([]);
     const [updates, setUpdates] = useState<any[]>([]);
 
+    const [excelData, setExcelData] = useState<any[]>([]);
+    const metadata = useStore($metadata);
+    const data = useStore($data);
+    const realColumns = mapping.dhis2SourceOptions?.columns || [];
+
     const responses = useLiveQuery(() => db.trackerResponses.toArray());
     const errors = useLiveQuery(() => db.dataValueErrors.toArray());
     const conflicts = useLiveQuery(() => db.dataValueConflicts.toArray());
+
+    const programStageMapping = useStore($programStageMapping);
+    const attributeMapping = useStore($attributeMapping);
+    const organisationUnitMapping = useStore($organisationUnitMapping);
+    const enrollmentMapping = useStore($enrollmentMapping);
 
     const processRecords = async () => {
         const notProcessed = await db.trackerResponses
@@ -337,85 +335,152 @@ export default function ProgramImportSummary() {
 
     const insertData = async (
         api: Partial<{ engine: any; axios: AxiosInstance }>,
-        processedData: Partial<Processed>,
+        processedData: Processed,
+        mapping: Partial<IMapping>,
     ) => {
-        if (version >= 38) {
-            await insertTrackerData38({
-                processedData,
-                async: mapping.dhis2DestinationOptions?.async ?? false,
-                chunkSize: mapping.chunkSize ?? 100,
-                api,
-                onInsert: async (response) => {
-                    if (mapping.dhis2DestinationOptions?.async) {
-                        await db.trackerResponses.put({
-                            id: response.response.id,
-                            completed: "false",
-                            created: 0,
-                            deleted: 0,
-                            ignored: 0,
-                            updated: 0,
-                            children: [],
-                            resource: "multiple",
+        if (mapping.isSource) {
+            if (mapping.dataSource === "go-data") {
+                await groupGoData4Insert(
+                    goData,
+                    processedData.goData.inserts,
+                    processedData.goData.updates,
+                    prevGoData,
+                    mapping.authentication || {},
+                    async (message) => {
+                        await db.messages.put({
+                            message: "Loading previous mapping",
+                            id: 1,
                         });
-                        setCount((c) => c + 1);
-                    } else {
-                        const id = generateUid();
-                        await db.trackerResponses.put({
-                            id,
-                            completed: "true",
-                            children: [
+                    },
+                    setInserted,
+                    setUpdates,
+                    setErrored,
+                );
+            } else if (
+                mapping.dataSource &&
+                ["csv-line-list", "xlsx-line-list"].indexOf(
+                    mapping.dataSource,
+                ) !== -1
+            ) {
+                const levels = await db.levels.toArray();
+                const allStages =
+                    program.programStages?.reduce<Record<string, number>>(
+                        (a, b) => {
+                            const stageData = maxBy(
+                                processedData.processedData,
+                                `0-${b.id}-max`,
+                            );
+                            a[b.id] = stageData?.[`0-${b.id}-max`] ?? 1;
+                            return a;
+                        },
+                        {},
+                    ) ?? {};
+                await generateExcelData(
+                    program,
+                    realColumns,
+                    allStages,
+                    processedData.processedData,
+                    enrollmentOptions
+                        .map<Option>(({ label, value }) => ({
+                            label,
+                            value: `0-${value}`,
+                        }))
+                        .concat(
+                            levels.flatMap<Option>(({ value, label }) => [
                                 {
-                                    ...response.bundleReport.typeReportMap[
-                                        "TRACKED_ENTITY"
-                                    ].stats,
-                                    completed: "true",
-                                    resource: "entities",
-                                    id: id + "entities",
+                                    value: `level${value}id`,
+                                    label: `${label} id`,
                                 },
                                 {
-                                    ...response.bundleReport.typeReportMap[
-                                        "ENROLLMENT"
-                                    ].stats,
-                                    completed: "true",
-                                    resource: "enrollments",
-                                    id: id + "enrollments",
+                                    value: `level${value}name`,
+                                    label: `${label} name`,
                                 },
-                                {
-                                    ...response.bundleReport.typeReportMap[
-                                        "EVENT"
-                                    ].stats,
-                                    completed: "true",
-                                    resource: "events",
-                                    id: id + "events",
-                                },
-                                {
-                                    ...response.bundleReport.typeReportMap[
-                                        "RELATIONSHIP"
-                                    ].stats,
-                                    completed: "true",
-                                    resource: "relationships",
-                                    id: id + "relationships",
-                                },
-                            ],
-                            ...response.stats,
-                        });
-                    }
-                },
-            });
+                            ]),
+                        ),
+                );
+            }
         } else {
-            await insertTrackerData({
-                processedData: processed,
-                callBack: (message: string) => setMessage(() => message),
-                api,
-                onInsert: (resource, response) => {
-                    updateResponse(resource, response);
-                },
-                chunkSize: mapping.chunkSize ?? 100,
-            });
+            if (version >= 38) {
+                await insertTrackerData38({
+                    processedData,
+                    async: mapping.dhis2DestinationOptions?.async ?? false,
+                    chunkSize: mapping.chunkSize ?? 100,
+                    api,
+                    onInsert: async (response) => {
+                        if (mapping.dhis2DestinationOptions?.async) {
+                            try {
+                                await db.trackerResponses.put({
+                                    id: response.response.id,
+                                    completed: "false",
+                                    created: 0,
+                                    deleted: 0,
+                                    ignored: 0,
+                                    updated: 0,
+                                    children: [],
+                                    resource: "multiple",
+                                });
+                                setCount((c) => c + 1);
+                            } catch (error) {}
+                        } else {
+                            const id = generateUid();
+                            await db.trackerResponses.put({
+                                id,
+                                completed: "true",
+                                children: [
+                                    {
+                                        ...response.bundleReport.typeReportMap[
+                                            "TRACKED_ENTITY"
+                                        ].stats,
+                                        completed: "true",
+                                        resource: "entities",
+                                        id: id + "entities",
+                                    },
+                                    {
+                                        ...response.bundleReport.typeReportMap[
+                                            "ENROLLMENT"
+                                        ].stats,
+                                        completed: "true",
+                                        resource: "enrollments",
+                                        id: id + "enrollments",
+                                    },
+                                    {
+                                        ...response.bundleReport.typeReportMap[
+                                            "EVENT"
+                                        ].stats,
+                                        completed: "true",
+                                        resource: "events",
+                                        id: id + "events",
+                                    },
+                                    {
+                                        ...response.bundleReport.typeReportMap[
+                                            "RELATIONSHIP"
+                                        ].stats,
+                                        completed: "true",
+                                        resource: "relationships",
+                                        id: id + "relationships",
+                                    },
+                                ],
+                                ...response.stats,
+                            });
+                        }
+                    },
+                });
+            } else {
+                await insertTrackerData({
+                    processedData: processed,
+                    callBack: (message: string) =>
+                        db.messages.put({ message, id: 1 }),
+                    api,
+                    onInsert: (resource, response) => {
+                        updateResponse(resource, response);
+                    },
+                    chunkSize: mapping.chunkSize ?? 100,
+                });
+            }
         }
     };
 
-    const processProgram = async () => {
+    const fetchAndInsert = async () => {
         let insertApi: Partial<{ engine: any; axios: AxiosInstance }> = {};
         let queryApi: Partial<{ engine: any; axios: AxiosInstance }> = {};
         if (mapping.isSource) {
@@ -431,212 +496,65 @@ export default function ProgramImportSummary() {
                 queryApi = { axios: remoteAPI };
             }
         }
-
-        if (
-            mapping.prefetch ||
-            [
-                "csv-line-list",
-                "xlsx-line-list",
-                "xlsx-tabular-data",
-                "xlsx-form",
-            ].indexOf(mapping.dataSource ?? "") !== -1
-        ) {
-            await insertData(insertApi, processed);
-        } else {
-            // await fetchTrackedEntityInstances(
-            //     {
-            //         api: queryApi,
-            //         program: mapping.program?.remoteProgram,
-            //         withAttributes: false,
-            //         uniqueAttributeValues: [],
-            //         additionalParams,
-            //         trackedEntityInstances: [],
-            //     },
-            //     async ({ trackedEntityInstances, pager }) => {
-            //         setMessage(
-            //             () =>
-            //                 `Finished fetching page ${pager?.page} of ${pager?.pageCount} from source`,
-            //         );
-            //         await processInstances(
-            //             {
-            //                 engine,
-            //                 trackedEntityInstances:
-            //                     trackedEntityInstances ?? [],
-            //                 mapping,
-            //                 version,
-            //                 attributeMapping,
-            //                 program,
-            //                 programStageMapping,
-            //                 optionMapping,
-            //                 organisationUnitMapping,
-            //                 programStageUniqueElements,
-            //                 programUniqAttributes,
-            //                 enrollmentMapping,
-            //                 setMessage,
-            //             },
-            //             async (data) => {
-            //                 await insertData(insertApi, data);
-            //             },
-            //         );
-            //     },
-            // );
-        }
-    };
-
-    const fetchAndInsert = async () => {
         await db.trackerResponses.clear();
         await db.dataValueConflicts.clear();
         await db.dataValueErrors.clear();
+        await db.messages.clear();
         onOpen();
-        if (mapping.isSource && mapping.dataSource === "api") {
-            const { newInserts } = otherProcessed;
-            if (mapping.prefetch && newInserts) {
-                for (const payload of newInserts) {
-                    const response = await postRemote<any>(
-                        mapping.authentication,
-                        "",
-                        payload,
-                        {},
-                    );
-                }
-            } else {
-                await fetchTrackedEntityInstances(
-                    {
-                        api: { engine },
-                        program: mapping.program?.program,
-                        additionalParams,
-                        uniqueAttributeValues: [],
-                        withAttributes: false,
-                        trackedEntityInstances: [],
-                    },
-                    async ({ trackedEntityInstances, pager }) => {
-                        setMessage(
-                            () =>
-                                `Working on page ${pager?.page} for tracked entities`,
-                        );
-                        // const actual = await convertFromDHIS2(
-                        //     flattenTrackedEntityInstances(
-                        //         {
-                        //             trackedEntityInstances,
-                        //         },
-                        //         "ALL"
-                        //     ),
-                        //     mapping,
-                        //     organisationUnitMapping,
-                        //     attributeMapping,
-                        //     false,
-                        //     optionMapping
-                        // );
-
-                        // for (const payload of actual) {
-                        //     try {
-                        //         const response = await postRemote<any>(
-                        //             mapping.authentication,
-                        //             "",
-                        //             payload,
-                        //             {}
-                        //         );
-                        //     } catch (error: any) {
-                        //         toast({
-                        //             title: "insert Failed",
-                        //             description: error?.message,
-                        //             status: "error",
-                        //             duration: 9000,
-                        //             isClosable: true,
-                        //         });
-                        //     }
-                        // }
-                    },
-                );
-            }
-        } else if (mapping.isSource && mapping.dataSource === "go-data") {
-            const {
-                params,
-                basicAuth,
-                hasNextLink,
-                headers,
-                password,
-                username,
-                ...rest
-            } = mapping.authentication || {};
-
-            if (mapping.prefetch) {
-                const { conflicts, errors, processed } = processedGoDataData;
-                if (processed) {
-                    const { updates, inserts } = processed;
-                    await groupGoData4Insert(
-                        goData,
-                        inserts,
-                        updates,
-                        prevGoData,
-                        mapping.authentication || {},
-                        setMessage,
-                        setInserted,
-                        setUpdates,
-                        setErrored,
-                    );
-                }
-            } else {
-                const { metadata, prev } = await fetchGoDataData(
-                    goData,
-                    mapping.authentication || {},
-                );
-                await fetchTrackedEntityInstances(
-                    {
-                        api: { engine },
-                        program: mapping.program?.program,
-                        additionalParams,
-                        uniqueAttributeValues: [],
-                        withAttributes: false,
-                        trackedEntityInstances: [],
-                    },
-                    async ({ trackedEntityInstances, pager }) => {
-                        setMessage(
-                            () =>
-                                `Working on page ${pager?.page} for tracked entities`,
-                        );
-                        const { processed, errors, conflicts } =
-                            convertToGoData(
-                                flattenEntitiesByEvents(
-                                    trackedEntityInstances ?? [],
-                                ),
-                                organisationUnitMapping,
-                                attributeMapping,
-                                goData,
-                                optionMapping,
-                                tokens,
-                                metadata,
-                            );
-                        const { inserts, updates } = processed;
-                        await groupGoData4Insert(
-                            goData,
-                            inserts,
-                            updates,
-                            prev,
-                            mapping.authentication || {},
-                            setMessage,
-                            setInserted,
-                            setUpdates,
-                            setErrored,
-                        );
-                    },
-                );
-            }
-        } else if (mapping.dataSource === "dhis2-program") {
-            await processProgram();
-        } else if (mapping.dataSource === "go-data" && !mapping.prefetch) {
+        if (mapping.prefetch) {
+            await insertData(insertApi, processed, mapping);
         } else {
-            onOpen();
-            await insertData({ engine }, processed);
-            onClose();
+            await convert({
+                afterConversion: async (converted) => {
+                    if (
+                        mapping.dataSource &&
+                        mapping.isSource &&
+                        ["csv-line-list", "xlsx-line-list"].indexOf(
+                            mapping.dataSource,
+                        ) !== -1
+                    ) {
+                        setExcelData((prev) => [
+                            ...prev,
+                            ...converted.processedData,
+                        ]);
+                    } else {
+                        await insertData(insertApi, converted, mapping);
+                    }
+                },
+                attributeMapping,
+                programStageMapping,
+                mapping,
+                sourceApi: queryApi,
+                destinationApi: insertApi,
+                optionMapping: optionMapping,
+                enrollmentMapping,
+                version,
+                additionalParams: {},
+                setMessage: () => {},
+                organisationUnitMapping,
+                goData,
+                data,
+                tokens,
+                program,
+                metadata,
+                referenceData,
+            });
+
+            if (
+                mapping.dataSource &&
+                mapping.isSource &&
+                ["csv-line-list", "xlsx-line-list"].indexOf(
+                    mapping.dataSource,
+                ) !== -1
+            ) {
+                setExcelData(excelData);
+            }
         }
         onClose();
     };
-
     useEffect(() => {
         fetchAndInsert();
     }, []);
-
     useEffect(() => {
         const intervalId = setInterval(() => {
             processRecords();
@@ -646,13 +564,9 @@ export default function ProgramImportSummary() {
     }, [count]);
     return (
         <Stack>
+            <Text>Import Summary</Text>
             <Tabs items={items} />
-            <Progress
-                onClose={onClose}
-                isOpen={isOpen}
-                message={message}
-                onOpen={onOpen}
-            />
+            <Progress onClose={onClose} isOpen={isOpen} db={db} />
         </Stack>
     );
 }

@@ -1,20 +1,23 @@
-import { Stack, useDisclosure } from "@chakra-ui/react";
+import { Button, Stack, useDisclosure } from "@chakra-ui/react";
 import { useDataEngine } from "@dhis2/app-runtime";
 import { AxiosInstance } from "axios";
 import { convert } from "data-import-wizard-utils";
 import { useStore } from "effector-react";
-import { uniqBy } from "lodash";
-import { useEffect, useState } from "react";
-import { processedGoDataDataApi, processor } from "../../Events";
+import { saveAs } from "file-saver";
+import { useEffect } from "react";
+import { CQIDexie } from "../../db";
+import { processor } from "../../Events";
 import {
     $attributeMapping,
     $data,
     $enrollmentMapping,
     $goData,
+    $goDataOptions,
     $mapping,
     $metadata,
     $optionMapping,
     $organisationUnitMapping,
+    $processed,
     $program,
     $programStageMapping,
     $remoteAPI,
@@ -25,10 +28,11 @@ import { $version } from "../../Store";
 import GoDataPreview from "../GoDataPreview";
 import Progress from "../Progress";
 import SwitchComponent, { Case } from "../SwitchComponent";
+import ExcelExportPreview from "./ExcelExportPreview";
 import OtherSystemPreview from "./OtherSystemPreview";
 import TrackerDataPreview from "./TrackerDataPreview";
 
-export default function ProgramDataPreview() {
+export default function ProgramDataPreview({ db }: { db: CQIDexie }) {
     const version = useStore($version);
     const metadata = useStore($metadata);
     const program = useStore($program);
@@ -36,18 +40,20 @@ export default function ProgramDataPreview() {
     const engine = useDataEngine();
     const { isOpen, onOpen, onClose } = useDisclosure();
     const mapping = useStore($mapping);
-    const programStageMapping = useStore($programStageMapping);
-    const enrollmentMapping = useStore($enrollmentMapping);
-    const organisationUnitMapping = useStore($organisationUnitMapping);
-    const attributeMapping = useStore($attributeMapping);
     const optionMapping = useStore($optionMapping);
+    const organisationUnitMapping = useStore($organisationUnitMapping);
+    const enrollmentMapping = useStore($enrollmentMapping);
+    const attributeMapping = useStore($attributeMapping);
+    const programStageMapping = useStore($programStageMapping);
     const goData = useStore($goData);
     const data = useStore($data);
-    const [message, setMessage] = useState<string>("");
     const remoteApi = useStore($remoteAPI);
+    const processed = useStore($processed);
+    const referenceData = useStore($goDataOptions);
+
     const process = async () => {
+        onOpen();
         processor.reset();
-        processedGoDataDataApi.reset();
         let sourceApi: Partial<{ engine: any; axios: AxiosInstance }> = {};
         let destinationApi: Partial<{ engine: any; axios: AxiosInstance }> = {};
         if (mapping.isSource) {
@@ -62,29 +68,30 @@ export default function ProgramDataPreview() {
         } else {
             destinationApi = { engine };
         }
-        onOpen();
-        setMessage(() => "Fetching data");
+        await db.messages.put({
+            message: "Fetching data",
+            id: 1,
+        });
+
+        let excelData: any[] = [];
         await convert({
             afterConversion: (converted) => {
-                if (mapping.isSource) {
+                processor.addGoData(converted);
+                processor.addDHIS2Data(converted);
+
+                if (
+                    mapping.isSource &&
+                    mapping.dataSource &&
+                    ["csv-line-list", "xlsx-line-list"].indexOf(
+                        mapping.dataSource,
+                    ) !== -1
+                ) {
+                    excelData = excelData.concat(converted.processedData);
                 } else {
-                    const {
-                        trackedEntityInstances,
-                        enrollments,
-                        events,
-                        trackedEntityInstanceUpdates,
-                        eventUpdates,
-                        errors,
-                        conflicts,
-                    } = converted;
-                    processor.addInstances(trackedEntityInstances);
-                    processor.addEnrollments(enrollments);
-                    processor.addEvents(events);
-                    processor.addInstanceUpdated(trackedEntityInstanceUpdates);
-                    processor.addEventUpdates(eventUpdates);
-                    processor.addErrors(uniqBy(errors, "id"));
-                    processor.addConflicts(uniqBy(conflicts, "id"));
+                    processor.addProcessedData(converted);
                 }
+
+                onClose();
             },
             attributeMapping,
             programStageMapping,
@@ -95,21 +102,62 @@ export default function ProgramDataPreview() {
             enrollmentMapping,
             version,
             additionalParams: {},
-            setMessage,
+            setMessage: (message) => {
+                db.messages.put({
+                    message,
+                    id: 1,
+                });
+            },
             organisationUnitMapping,
             goData,
             data,
             tokens,
             program,
             metadata,
+            referenceData,
         });
-        onClose();
+        if (
+            mapping.isSource &&
+            mapping.dataSource &&
+            ["csv-line-list", "xlsx-line-list"].indexOf(mapping.dataSource) !==
+                -1
+        ) {
+            processor.addProcessedData({
+                ...processed,
+                processedData: excelData,
+            });
+        }
     };
 
     useEffect(() => {
         process();
         return () => {};
     }, []);
+
+    const download = () => {
+        if (!mapping.isSource) {
+            const enrollments = new Blob(
+                [JSON.stringify(processed.dhis2.enrollments)],
+                {
+                    type: "application/json",
+                },
+            );
+
+            const trackedEntityInstances = new Blob(
+                [JSON.stringify(processed.dhis2.trackedEntityInstances)],
+                {
+                    type: "application/json",
+                },
+            );
+            const events = new Blob([JSON.stringify(processed.dhis2.events)], {
+                type: "application/json",
+            });
+            saveAs(enrollments, "enrollments.json");
+            saveAs(trackedEntityInstances, "trackedEntityInstances.json");
+            saveAs(events, "events.json");
+        }
+    };
+
     return (
         <Stack
             h="calc(100vh - 350px)"
@@ -119,12 +167,17 @@ export default function ProgramDataPreview() {
             <SwitchComponent condition={mapping.isSource}>
                 <Case value={true}>
                     <SwitchComponent condition={mapping.dataSource}>
-                        <Case value="csv-line-list">CSV</Case>
-                        <Case value="xlsx-line-list">XLSX</Case>
+                        <Case value="csv-line-list">
+                            <ExcelExportPreview db={db} />
+                        </Case>
+                        <Case value="xlsx-line-list">
+                            <ExcelExportPreview db={db} />
+                        </Case>
                         <Case value="go-data">
                             <GoDataPreview />
                         </Case>
                         <Case value="json">JSON</Case>
+                        <Case value="fhir">FHIR</Case>
                         <Case value="api">
                             <OtherSystemPreview />
                         </Case>
@@ -137,12 +190,10 @@ export default function ProgramDataPreview() {
                     <TrackerDataPreview />
                 </Case>
             </SwitchComponent>
-            <Progress
-                onClose={onClose}
-                isOpen={isOpen}
-                message={message}
-                onOpen={onOpen}
-            />
+            <Stack>
+                <Button onClick={download}>Download Data</Button>
+            </Stack>
+            <Progress onClose={onClose} isOpen={isOpen} db={db} />
         </Stack>
     );
 }

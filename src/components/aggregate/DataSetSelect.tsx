@@ -7,6 +7,7 @@ import { useStore } from "effector-react";
 import { useEffect } from "react";
 import { $mapping } from "../../Store";
 
+import { CQIDexie } from "../../db";
 import {
     dataSetApi,
     indicatorApi,
@@ -19,7 +20,7 @@ import { hasAttribution } from "../../utils/utils";
 import Loader from "../Loader";
 import Progress from "../Progress";
 
-export default function DataSetSelect() {
+export default function DataSetSelect({ db }: { db: CQIDexie }) {
     const mapping = useStore($mapping);
     const { isOpen, onOpen, onClose } = useDisclosure();
     const engine = useDataEngine();
@@ -51,24 +52,14 @@ export default function DataSetSelect() {
                 fields: "id,name,code,periodType,organisationUnits[id,name,code],categoryCombo[categories[id,name,code,categoryOptions[id,name,code]],categoryOptionCombos[code,name,id,categoryOptions[id,name,code]]],dataSetElements[dataElement[id,name,code,categoryCombo[categories[id,name,code,categoryOptions[id,name,code]],categoryOptionCombos[code,name,id,categoryOptions[id,name,code]]]]]",
             });
             const attribution = hasAttribution(dataSet);
-            mappingApi.update({
-                attribute: "aggregate",
-                value: attribution,
-                path: "hasAttribution",
+            mappingApi.updateMany({
+                aggregate: {
+                    ...mapping.aggregate,
+                    hasAttribution: attribution,
+                    dataSet: id,
+                    periodType: dataSet.periodType,
+                },
             });
-            mappingApi.update({
-                attribute: "aggregate",
-                path: "dataSet",
-                value: id,
-            });
-
-            if (!mapping.isSource) {
-                mappingApi.update({
-                    attribute: "aggregate",
-                    path: "periodType",
-                    value: dataSet.periodType,
-                });
-            }
             dataSetApi.set(dataSet);
             onClose();
             stepper.next();
@@ -78,6 +69,10 @@ export default function DataSetSelect() {
     const loadMetadata = async () => {
         onOpen();
         if (mapping.dataSource === "dhis2-program-indicators") {
+            db.messages.put({
+                message: "Loading program indicators...",
+                id: 1,
+            });
             const data = await getDHIS2Resource<{
                 programIndicators: Option[];
             }>({
@@ -91,6 +86,10 @@ export default function DataSetSelect() {
             });
             programIndicatorApi.set(data.programIndicators);
         } else if (mapping.dataSource === "dhis2-indicators") {
+            db.messages.put({
+                message: "Loading indicators...",
+                id: 1,
+            });
             const data = await getDHIS2Resource<{ indicators: Option[] }>({
                 isCurrentDHIS2: mapping.isCurrentInstance,
                 engine,
@@ -102,6 +101,10 @@ export default function DataSetSelect() {
             });
             indicatorApi.set(data.indicators);
         }
+        db.messages.put({
+            message: "",
+            id: 1,
+        });
         onClose();
     };
 
@@ -119,7 +122,13 @@ export default function DataSetSelect() {
                     whiteSpace="nowrap"
                     h="calc(100vh - 350px)"
                 >
-                    {isLoading && <Loader />}
+                    {isLoading && (
+                        <Progress
+                            onClose={() => !isLoading}
+                            db={db}
+                            isOpen={isLoading}
+                        />
+                    )}
                     {isSuccess && (
                         <Table
                             columns={columns}
@@ -138,13 +147,7 @@ export default function DataSetSelect() {
                     {isError && JSON.stringify(error)}
                 </Box>
             </Box>
-
-            <Progress
-                onClose={onClose}
-                isOpen={isOpen}
-                message="Loading Selected DataSet"
-                onOpen={onOpen}
-            />
+            <Progress onClose={onClose} isOpen={isOpen} db={db} />
         </Stack>
     );
 }

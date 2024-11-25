@@ -25,14 +25,7 @@ export default function FileUpload({
             fileReader.onload = async (e) => {
                 const result = e.target?.result;
                 if (result && type === "json") {
-                    if (mapping.dataSource === "fhir") {
-                        const data = flattenBundle(JSON.parse(String(result)));
-                        if (data) {
-                            dataApi.changeData(data);
-                        }
-                    } else {
-                        dataApi.changeData(JSON.parse(String(result)));
-                    }
+                    dataApi.changeData(JSON.parse(String(result)));
                 } else {
                     const workbook = read(e.target?.result, {
                         type: "array",
