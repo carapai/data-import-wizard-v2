@@ -1,27 +1,28 @@
-import { Button, Stack, useDisclosure } from "@chakra-ui/react";
+import { Button, Stack, Text, useDisclosure } from "@chakra-ui/react";
 import { useDataEngine } from "@dhis2/app-runtime";
 import { AxiosInstance } from "axios";
-import { convert } from "data-import-wizard-utils";
+import { convert, Option } from "data-import-wizard-utils";
 import { useStore } from "effector-react";
 import { saveAs } from "file-saver";
 import { useEffect } from "react";
 import { CQIDexie } from "../../db";
 import { processor } from "../../Events";
+import { useOneLiveQuery } from "../../hooks/useOneLiveQuery";
 import {
-    $attributeMapping,
-    $data,
-    $enrollmentMapping,
-    $goData,
-    $goDataOptions,
-    $mapping,
-    $metadata,
-    $optionMapping,
-    $organisationUnitMapping,
-    $processed,
-    $program,
-    $programStageMapping,
-    $remoteAPI,
-    $tokens,
+	$attributeMapping,
+	$data,
+	$enrollmentMapping,
+	$goData,
+	$goDataOptions,
+	$mapping,
+	$metadata,
+	$optionMapping,
+	$organisationUnitMapping,
+	$processed,
+	$program,
+	$programStageMapping,
+	$remoteAPI,
+	$tokens
 } from "../../Store";
 
 import { $version } from "../../Store";
@@ -50,6 +51,8 @@ export default function ProgramDataPreview({ db }: { db: CQIDexie }) {
     const remoteApi = useStore($remoteAPI);
     const processed = useStore($processed);
     const referenceData = useStore($goDataOptions);
+
+    const levels = useOneLiveQuery<Option>(db.levels.toArray(), []);
 
     const process = async () => {
         onOpen();
@@ -158,6 +161,8 @@ export default function ProgramDataPreview({ db }: { db: CQIDexie }) {
         }
     };
 
+    if (levels === null) return <Text>Loading...</Text>;
+
     return (
         <Stack
             h="calc(100vh - 350px)"
@@ -168,10 +173,10 @@ export default function ProgramDataPreview({ db }: { db: CQIDexie }) {
                 <Case value={true}>
                     <SwitchComponent condition={mapping.dataSource}>
                         <Case value="csv-line-list">
-                            <ExcelExportPreview db={db} />
+                            <ExcelExportPreview db={db} levels={levels} />
                         </Case>
                         <Case value="xlsx-line-list">
-                            <ExcelExportPreview db={db} />
+                            <ExcelExportPreview db={db} levels={levels} />
                         </Case>
                         <Case value="go-data">
                             <GoDataPreview />

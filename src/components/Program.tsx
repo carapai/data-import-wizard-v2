@@ -1,4 +1,4 @@
-import { Stack, useToast } from "@chakra-ui/react";
+import { Stack, Text, useToast } from "@chakra-ui/react";
 import { useDataEngine } from "@dhis2/app-runtime";
 import { useNavigate } from "@tanstack/react-location";
 import { Option, Step } from "data-import-wizard-utils";
@@ -7,31 +7,32 @@ import { LocationGenerics } from "../Interfaces";
 
 import { CQIDexie } from "../db";
 import { activeStepsApi, mappingApi, processor } from "../Events";
+import { useOneLiveQuery } from "../hooks/useOneLiveQuery";
 import {
-    $action,
-    $attributeMapping,
-    $data,
-    $dhis2Program,
-    $disabled,
-    $enrollmentMapping,
-    $goData,
-    $goDataOptions,
-    $mapping,
-    $name,
-    $names,
-    $optionMapping,
-    $organisationUnitMapping,
-    $otherName,
-    $prevGoData,
-    $processed,
-    $program,
-    $programStageMapping,
-    $programTypes,
-    $steps,
-    $token,
-    $tokens,
-    actionApi,
-    stepper,
+	$action,
+	$attributeMapping,
+	$data,
+	$dhis2Program,
+	$disabled,
+	$enrollmentMapping,
+	$goData,
+	$goDataOptions,
+	$mapping,
+	$name,
+	$names,
+	$optionMapping,
+	$organisationUnitMapping,
+	$otherName,
+	$prevGoData,
+	$processed,
+	$program,
+	$programStageMapping,
+	$programTypes,
+	$steps,
+	$token,
+	$tokens,
+	actionApi,
+	stepper
 } from "../Store";
 import { saveMapping } from "../utils/utils";
 import DataPreview from "./DataPreview";
@@ -77,6 +78,74 @@ const Program = ({ db }: { db: CQIDexie }) => {
     const attributeMapping = useStore($attributeMapping);
     const programStageMapping = useStore($programStageMapping);
     const navigate = useNavigate<LocationGenerics>();
+
+    const levels = useOneLiveQuery<Option>(db.levels.toArray(), []);
+
+    const onNext = () => {
+        if (activeStep === activeSteps().length - 1) {
+            processor.reset();
+            stepper.reset();
+        } else {
+            stepper.next();
+        }
+    };
+
+    const onSave = async () => {
+        await saveMapping({
+            engine,
+            mapping: {
+                ...mapping,
+                ...names,
+            },
+            action,
+            mappings: {
+                organisationUnitMapping,
+                attributeMapping,
+                programStageMapping,
+                enrollmentMapping,
+                optionMapping,
+            },
+        });
+
+        actionApi.edit();
+        toast({
+            title: "Mapping saved",
+            description: "Mapping has been successfully saved",
+            status: "success",
+            duration: 9000,
+            isClosable: true,
+        });
+    };
+    const onFinish = async () => {
+        if (
+            mapping.isSource &&
+            mapping.dataSource &&
+            ["json", "csv-line-list", "xlsx-line-list"].indexOf(
+                mapping.dataSource,
+            ) !== -1
+        ) {
+        } else {
+            mappingApi.reset({});
+            $attributeMapping.reset();
+            $mapping.reset();
+            $program.reset();
+            $optionMapping.reset();
+            $organisationUnitMapping.reset();
+            $programStageMapping.reset();
+            $processed.reset();
+            $prevGoData.reset();
+            $data.reset();
+            $goData.reset();
+            $programTypes.reset();
+            $tokens.reset();
+            $token.reset();
+            $goDataOptions.reset();
+            $dhis2Program.reset();
+            stepper.reset();
+            navigate({ to: "/mappings" });
+        }
+    };
+    if (levels === null) return <Text>Loading...</Text>;
 
     const steps: Step[] = [
         {
@@ -145,7 +214,7 @@ const Program = ({ db }: { db: CQIDexie }) => {
 
         {
             label: "Columns",
-            content: <Columns db={db} />,
+            content: <Columns db={db} levels={levels} />,
             nextLabel: "Next Step",
             id: 16,
             lastLabel: "Go to Mappings",
@@ -235,71 +304,6 @@ const Program = ({ db }: { db: CQIDexie }) => {
         });
         activeStepsApi.set(activeSteps);
         return activeSteps;
-    };
-
-    const onNext = () => {
-        if (activeStep === activeSteps().length - 1) {
-            processor.reset();
-            stepper.reset();
-        } else {
-            stepper.next();
-        }
-    };
-
-    const onSave = async () => {
-        await saveMapping({
-            engine,
-            mapping: {
-                ...mapping,
-                ...names,
-            },
-            action,
-            mappings: {
-                organisationUnitMapping,
-                attributeMapping,
-                programStageMapping,
-                enrollmentMapping,
-                optionMapping,
-            },
-        });
-
-        actionApi.edit();
-        toast({
-            title: "Mapping saved",
-            description: "Mapping has been successfully saved",
-            status: "success",
-            duration: 9000,
-            isClosable: true,
-        });
-    };
-    const onFinish = async () => {
-        if (
-            mapping.isSource &&
-            mapping.dataSource &&
-            ["json", "csv-line-list", "xlsx-line-list"].indexOf(
-                mapping.dataSource,
-            ) !== -1
-        ) {
-        } else {
-            mappingApi.reset({});
-            $attributeMapping.reset();
-            $mapping.reset();
-            $program.reset();
-            $optionMapping.reset();
-            $organisationUnitMapping.reset();
-            $programStageMapping.reset();
-            $processed.reset();
-            $prevGoData.reset();
-            $data.reset();
-            $goData.reset();
-            $programTypes.reset();
-            $tokens.reset();
-            $token.reset();
-            $goDataOptions.reset();
-            $dhis2Program.reset();
-            stepper.reset();
-            navigate({ to: "/mappings" });
-        }
     };
 
     return (

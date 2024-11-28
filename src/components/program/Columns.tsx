@@ -1,19 +1,50 @@
 import type { TabsProps } from "antd";
 import { Table, TableColumnsType, Tabs } from "antd";
 import { useStore } from "effector-react";
-import { Key, useState } from "react";
+import { useState } from "react";
 
-import { useLiveQuery } from "dexie-react-hooks";
+import { ExportColumn, Option } from "data-import-wizard-utils";
 import { CQIDexie } from "../../db";
 import { mappingApi } from "../../Events";
 import { $mapping, $program } from "../../Store";
+import { record } from "zod";
 
-export default function Columns({ db }: { db: CQIDexie }) {
+export default function Columns({
+    db,
+    levels,
+}: {
+    db: CQIDexie;
+    levels: Option[];
+}) {
     const program = useStore($program);
     const mapping = useStore($mapping);
     const [active, setActive] = useState<string>("miscellaneous");
 
-    const levels = useLiveQuery(() => db.levels.toArray());
+    const allAttributes =
+        program.programTrackedEntityAttributes?.map(
+            ({ trackedEntityAttribute: { id } }) => id,
+        ) ?? [];
+    const data = [
+        {
+            id: `0-enrollment`,
+            name: `Enrollment Id`,
+        },
+        {
+            id: `0-enrollmentDate`,
+            name: `Enrollment Date`,
+        },
+    ].concat(
+        levels?.flatMap(({ value, label }) => [
+            {
+                id: `level${value}id`,
+                name: `${label} id`,
+            },
+            {
+                id: `level${value}name`,
+                name: `${label} name`,
+            },
+        ]) ?? [],
+    );
 
     const columns: TableColumnsType<{ id: string; name: string }> = [
         {
@@ -35,10 +66,48 @@ export default function Columns({ db }: { db: CQIDexie }) {
                     type: "checkbox",
                     onSelect: (record) => {
                         let value = mapping.dhis2SourceOptions?.columns ?? [];
-                        if (value.includes(record.id)) {
-                            value = value.filter((key) => key !== record.id);
+                        const hasStage =
+                            value.find((c) => c.column === stage.id) !==
+                            undefined;
+                        const currentColumn: ExportColumn = {
+                            column: stage.id,
+                            label: stage.name,
+                            repeatable: stage.repeatable,
+                            children: [
+                                { column: record.id, label: record.name },
+                            ],
+                        };
+
+                        if (!hasStage) {
+                            value = value.map<ExportColumn>((column) => {
+                                if (column.column === stage.id) {
+                                    let children = column.children;
+                                    const search = children.find(
+                                        (c) => c.column === record.id,
+                                    );
+
+                                    if (search) {
+                                        children = children.filter(
+                                            (c) => c.column !== record.id,
+                                        );
+                                    } else {
+                                        children = children.concat({
+                                            column: record.id,
+                                            label: record.name,
+                                        });
+                                    }
+
+                                    return {
+                                        column: stage.id,
+                                        label: stage.name,
+										repeatable: stage.repeatable,
+                                        children,
+                                    };
+                                }
+                                return column;
+                            });
                         } else {
-                            value = value.concat(record.id);
+                            value = value.concat(currentColumn);
                         }
                         mappingApi.update({
                             attribute: "dhis2SourceOptions",
@@ -47,50 +116,47 @@ export default function Columns({ db }: { db: CQIDexie }) {
                         });
                     },
                     onSelectAll: (selected) => {
+                        const value = mapping.dhis2SourceOptions?.columns ?? [];
+                        const children = stage.programStageDataElements
+                            .map(({ dataElement: { id: column, name } }) => ({
+                                column,
+                                label: name,
+                            }))
+                            .concat([
+                                { column: `eventDate`, label: "Event Date" },
+                            ]);
                         if (selected) {
-                            let value =
-                                mapping.dhis2SourceOptions?.columns ?? [];
-                            value = value.concat(
-                                stage.programStageDataElements.map(
-                                    ({ dataElement: { id } }) =>
-                                        `${stage.id}-${id}`,
-                                ),
-                                `${stage.id}-eventDate`,
-                            );
                             mappingApi.update({
                                 attribute: "dhis2SourceOptions",
                                 path: "columns",
-                                value,
+                                value: value.concat({
+                                    column: stage.id,
+									repeatable: stage.repeatable,
+                                    children,
+                                    label: stage.name,
+                                }),
                             });
                         } else {
-                            let value =
-                                mapping.dhis2SourceOptions?.columns ?? [];
-
-                            const removeSet = stage.programStageDataElements
-                                .map(
-                                    ({ dataElement: { id } }) =>
-                                        `${stage.id}-${id}` as Key,
-                                )
-                                .concat(`${stage.id}-eventDate`);
-                            value = value.filter(
-                                (id) => !removeSet.includes(id),
-                            );
                             mappingApi.update({
                                 attribute: "dhis2SourceOptions",
                                 path: "columns",
-                                value,
+                                value: value.filter(
+                                    (c) => c.column !== stage.id,
+                                ),
                             });
                         }
                     },
-                    selectedRowKeys: mapping.dhis2SourceOptions?.columns ?? [],
+                    selectedRowKeys: mapping.dhis2SourceOptions?.columns
+                        ?.find((c) => c.column === stage.id)
+                        ?.children?.map(({ column }) => {
+                            return column;
+                        }),
                 }}
                 rowKey="id"
                 columns={columns}
-                dataSource={[
-                    { id: `${stage.id}-eventDate`, name: "Event Date" },
-                ].concat(
+                dataSource={[{ id: `eventDate`, name: "Event Date" }].concat(
                     stage.programStageDataElements.map((a) => ({
-                        id: `${stage.id}-${a.dataElement.id}`,
+                        id: `${a.dataElement.id}`,
                         name: a.dataElement.name,
                     })),
                 )}
@@ -114,12 +180,20 @@ export default function Columns({ db }: { db: CQIDexie }) {
                                     let value =
                                         mapping.dhis2SourceOptions?.columns ??
                                         [];
-                                    if (value.includes(record.id)) {
+                                    const hasColumn = value.find(
+                                        (c) => c.column === record.id,
+                                    );
+                                    if (hasColumn) {
                                         value = value.filter(
-                                            (key) => key !== record.id,
+                                            ({ column }) =>
+                                                column !== record.id,
                                         );
                                     } else {
-                                        value = value.concat(record.id);
+                                        value = value.concat({
+                                            column: record.id,
+                                            label: record.name,
+                                            children: [],
+                                        });
                                     }
                                     mappingApi.update({
                                         attribute: "dhis2SourceOptions",
@@ -128,35 +202,36 @@ export default function Columns({ db }: { db: CQIDexie }) {
                                     });
                                 },
                                 onSelectAll: (selected) => {
+                                    const removeSet =
+                                        data.map(({ id }) => id) ?? [];
+                                    let value =
+                                        mapping.dhis2SourceOptions?.columns ??
+                                        [];
                                     if (selected) {
-                                        let value =
-                                            mapping.dhis2SourceOptions
-                                                ?.columns ?? [];
-                                        value = value.concat(
-                                            program.programTrackedEntityAttributes?.map(
-                                                ({
-                                                    trackedEntityAttribute: {
-                                                        id,
-                                                    },
-                                                }) => id,
-                                            ) ?? [],
-                                        );
+                                        value = value
+                                            .filter(
+                                                ({ column }) =>
+                                                    removeSet.indexOf(
+                                                        column,
+                                                    ) === -1,
+                                            )
+                                            .concat(
+                                                removeSet.map((id) => ({
+                                                    column: id,
+                                                    children: [],
+                                                    label: record.name,
+                                                })) ?? [],
+                                            );
                                         mappingApi.update({
                                             attribute: "dhis2SourceOptions",
                                             path: "columns",
                                             value,
                                         });
                                     } else {
-                                        let value =
-                                            mapping.dhis2SourceOptions
-                                                ?.columns ?? [];
-
-                                        const removeSet =
-                                            program.programTrackedEntityAttributes?.map(
-                                                ({ id }) => id as Key,
-                                            ) ?? [];
                                         value = value.filter(
-                                            (id) => !removeSet.includes(id),
+                                            ({ column }) =>
+                                                removeSet.indexOf(column) ===
+                                                -1,
                                         );
                                         mappingApi.update({
                                             attribute: "dhis2SourceOptions",
@@ -166,31 +241,13 @@ export default function Columns({ db }: { db: CQIDexie }) {
                                     }
                                 },
                                 selectedRowKeys:
-                                    mapping.dhis2SourceOptions?.columns ?? [],
+                                    mapping.dhis2SourceOptions?.columns?.map(
+                                        (c) => c.column,
+                                    ) ?? [],
                             }}
                             rowKey="id"
                             columns={columns}
-                            dataSource={[
-                                {
-                                    id: `0-enrollment`,
-                                    name: `Enrollment Id`,
-                                },
-                                {
-                                    id: `0-enrollmentDate`,
-                                    name: `Enrollment Date`,
-                                },
-                            ].concat(
-                                levels?.flatMap(({ value, label }) => [
-                                    {
-                                        id: `level${value}id`,
-                                        name: `${label} id`,
-                                    },
-                                    {
-                                        id: `level${value}name`,
-                                        name: `${label} name`,
-                                    },
-                                ]) ?? [],
-                            )}
+                            dataSource={data}
                             pagination={false}
                             scroll={{ y: 55 * 10 }}
                         />
@@ -207,13 +264,23 @@ export default function Columns({ db }: { db: CQIDexie }) {
                                     let value =
                                         mapping.dhis2SourceOptions?.columns ??
                                         [];
-                                    if (value.includes(record.id)) {
+                                    const hasColumn =
+                                        value.find(
+                                            (c) => c.column === record.id,
+                                        ) !== undefined;
+                                    if (hasColumn) {
                                         value = value.filter(
-                                            (key) => key !== record.id,
+                                            ({ column }) =>
+                                                column !== record.id,
                                         );
                                     } else {
-                                        value = value.concat(record.id);
+                                        value = value.concat({
+                                            column: record.id,
+                                            label: record.name,
+                                            children: [],
+                                        });
                                     }
+                                    console.log(value);
                                     mappingApi.update({
                                         attribute: "dhis2SourceOptions",
                                         path: "columns",
@@ -221,35 +288,34 @@ export default function Columns({ db }: { db: CQIDexie }) {
                                     });
                                 },
                                 onSelectAll: (selected) => {
+                                    let value =
+                                        mapping.dhis2SourceOptions?.columns ??
+                                        [];
                                     if (selected) {
-                                        let value =
-                                            mapping.dhis2SourceOptions
-                                                ?.columns ?? [];
-                                        value = value.concat(
-                                            program.programTrackedEntityAttributes?.map(
-                                                ({
-                                                    trackedEntityAttribute: {
-                                                        id,
-                                                    },
-                                                }) => id,
-                                            ) ?? [],
+                                        value = value.filter(
+                                            ({ column }) =>
+                                                allAttributes.indexOf(
+                                                    column,
+                                                ) === -1,
                                         );
+
                                         mappingApi.update({
                                             attribute: "dhis2SourceOptions",
                                             path: "columns",
-                                            value,
+                                            value: value.concat(
+                                                allAttributes.map((id) => ({
+                                                    column: id,
+                                                    children: [],
+                                                    label: record.name,
+                                                })),
+                                            ),
                                         });
                                     } else {
-                                        let value =
-                                            mapping.dhis2SourceOptions
-                                                ?.columns ?? [];
-
-                                        const removeSet =
-                                            program.programTrackedEntityAttributes?.map(
-                                                ({ id }) => id as Key,
-                                            ) ?? [];
                                         value = value.filter(
-                                            (id) => !removeSet.includes(id),
+                                            ({ column }) =>
+                                                allAttributes.indexOf(
+                                                    column,
+                                                ) === -1,
                                         );
                                         mappingApi.update({
                                             attribute: "dhis2SourceOptions",
@@ -259,7 +325,18 @@ export default function Columns({ db }: { db: CQIDexie }) {
                                     }
                                 },
                                 selectedRowKeys:
-                                    mapping.dhis2SourceOptions?.columns ?? [],
+                                    mapping.dhis2SourceOptions?.columns?.flatMap(
+                                        (c) => {
+                                            if (
+                                                allAttributes.indexOf(
+                                                    c.column,
+                                                ) !== -1
+                                            ) {
+                                                return c.column;
+                                            }
+                                            return [];
+                                        },
+                                    ) ?? [],
                             }}
                             rowKey="id"
                             columns={columns}
