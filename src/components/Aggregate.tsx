@@ -149,12 +149,8 @@ const Aggregate = ({ db }: { db: CQIDexie }) => {
         return steps.filter(({ id }) => {
             const notPrefetch = mapping.prefetch ? [] : [9];
             const prefetch = mapping.prefetch ? [9] : [];
-            const hasAttribution = mapping.aggregate?.hasAttribution
-                ? [11]
-                : [];
-            const hasNoAttribution = mapping.aggregate?.hasAttribution
-                ? []
-                : [11];
+            const hasAttribution = mapping.hasAttribution ? [11] : [];
+            const hasNoAttribution = mapping.hasAttribution ? [] : [11];
             if (mapping.dataSource === "api") {
                 return (
                     [1, 2, 3, ...prefetch, ...hasAttribution].indexOf(id) !== -1

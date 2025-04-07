@@ -51,14 +51,14 @@ export default function DataSetSelect({ db }: { db: CQIDexie }) {
                 id,
                 fields: "id,name,code,periodType,organisationUnits[id,name,code],categoryCombo[categories[id,name,code,categoryOptions[id,name,code]],categoryOptionCombos[code,name,id,categoryOptions[id,name,code]]],dataSetElements[dataElement[id,name,code,categoryCombo[categories[id,name,code,categoryOptions[id,name,code]],categoryOptionCombos[code,name,id,categoryOptions[id,name,code]]]]]",
             });
-            const attribution = hasAttribution(dataSet);
+            const attribution = hasAttribution(dataSet.categoryCombo);
             mappingApi.updateMany({
                 aggregate: {
                     ...mapping.aggregate,
-                    hasAttribution: attribution,
                     dataSet: id,
                     periodType: dataSet.periodType,
                 },
+                hasAttribution: attribution,
             });
             dataSetApi.set(dataSet);
             onClose();

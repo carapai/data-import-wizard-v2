@@ -42,16 +42,18 @@ export default function Search({
 
     const [includeMapped, setIncludeMapped] = useState<boolean>(false);
     const [includeUnmapped, setIncludeUnmapped] = useState<boolean>(false);
-    const mapped = Object.entries(mapping).flatMap(([id, { source }]) => {
+    const mapped = Array.from(mapping.entries()).flatMap(([id, { source }]) => {
         if (source && sourceOptions.find((o) => o.value === source)) return id;
         return [];
     });
     const filterMapped = () => {
-        const mapped = Object.entries(mapping).flatMap(([id, { source }]) => {
-            if (source && sourceOptions.find((o) => o.value === source))
-                return id;
-            return [];
-        });
+        const mapped = Array.from(mapping.entries()).flatMap(
+            ([id, { source }]) => {
+                if (source && sourceOptions.find((o) => o.value === source))
+                    return id;
+                return [];
+            },
+        );
         action(() =>
             destinationOptions.filter(
                 ({ value = "" }) => mapped.indexOf(value) !== -1,
@@ -67,12 +69,14 @@ export default function Search({
     };
 
     const sourceUnMapped = () => {
-        const mapped = Object.entries(mapping).flatMap(([_, { source }]) => {
-            if (source) {
-                return source.trim().toLowerCase().replaceAll(" ", "");
-            }
-            return [];
-        });
+        const mapped = Array.from(mapping.entries()).flatMap(
+            ([_, { source }]) => {
+                if (source) {
+                    return source.trim().toLowerCase().replaceAll(" ", "");
+                }
+                return [];
+            },
+        );
         return orderBy(
             sourceOptions.filter(({ value = "" }) => {
                 const current = value.toLowerCase().replaceAll(" ", "");
@@ -121,7 +125,7 @@ export default function Search({
     };
 
     return (
-        <Stack direction="row">
+        <Stack direction="row" flex={1}>
             <Checkbox
                 isChecked={includeMapped}
                 onChange={(e: ChangeEvent<HTMLInputElement>) => {

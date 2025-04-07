@@ -1,5 +1,6 @@
-import { Checkbox, Stack, useDisclosure } from "@chakra-ui/react";
+import { Checkbox, Stack, Text, useDisclosure } from "@chakra-ui/react";
 import { useDataEngine } from "@dhis2/app-runtime";
+import { Input } from "antd";
 import { Option } from "data-import-wizard-utils";
 import { useStore } from "effector-react";
 import { useEffect } from "react";
@@ -7,6 +8,7 @@ import { CQIDexie } from "../db";
 import { mappingApi, ouMappingApi, remoteOrganisationsApi } from "../Events";
 import { getDHIS2Resource } from "../Queries";
 import { $mapping, $metadata, $organisationUnitMapping } from "../Store";
+import FileUpload from "./FileUpload";
 import GenericMapping from "./GenericMapping";
 import InfoMapping from "./InfoMapping";
 import Progress from "./Progress";
@@ -16,13 +18,10 @@ export default function OrganisationUnitMapping({ db }: { db: CQIDexie }) {
     const mapping = useStore($mapping);
     const metadata = useStore($metadata);
     const organisationUnitMapping = useStore($organisationUnitMapping);
-
     const {
         customOrgUnitColumn = false,
         orgUnitColumn = "",
         matchHierarchy = false,
-        otherHierarchyColumns = "",
-        customOtherHierarchyColumns = false,
     } = mapping.orgUnitMapping ?? {};
 
     const fetchOrganisationsByLevel = async () => {
@@ -84,6 +83,8 @@ export default function OrganisationUnitMapping({ db }: { db: CQIDexie }) {
                     "dhis2-data-set",
                     "dhis2-program",
                     "manual-dhis2-program-indicators",
+                    "fhir",
+                    "go-data",
                 ].indexOf(mapping.dataSource ?? "") === -1 && (
                     <InfoMapping
                         value={orgUnitColumn}
@@ -123,6 +124,39 @@ export default function OrganisationUnitMapping({ db }: { db: CQIDexie }) {
                         </Checkbox>
                     </InfoMapping>
                 )}
+
+                {["fhir"].indexOf(mapping.dataSource ?? "") !== -1 && (
+                    <Stack>
+                        <FileUpload
+                            type="xlsx"
+                            extraction="json"
+                            onDataChange={remoteOrganisationsApi.set}
+                            fileUploadLabel="Upload Excel Organisation File"
+                        />
+                        <Stack>
+                            <Text>Label Field</Text>
+                            <Input
+                                value={mapping.remoteOrgUnitLabelField}
+                                onChange={(e) =>
+                                    mappingApi.updateMany({
+                                        remoteOrgUnitLabelField: e.target.value,
+                                    })
+                                }
+                            />
+                        </Stack>
+                        <Stack>
+                            <Text>Value Field</Text>
+                            <Input
+                                value={mapping.remoteOrgUnitValueField}
+                                onChange={(e) =>
+                                    mappingApi.updateMany({
+                                        remoteOrgUnitValueField: e.target.value,
+                                    })
+                                }
+                            />
+                        </Stack>
+                    </Stack>
+                )}
             </Stack>
             <GenericMapping
                 destinationOptions={metadata.destinationOrgUnits}
@@ -136,6 +170,7 @@ export default function OrganisationUnitMapping({ db }: { db: CQIDexie }) {
             />
 
             <Progress onClose={onClose} isOpen={isOpen} db={db} />
+            <pre>{JSON.stringify(organisationUnitMapping.keys(), null, 2)}</pre>
         </Stack>
     );
 }

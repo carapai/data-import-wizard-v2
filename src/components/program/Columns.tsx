@@ -4,18 +4,10 @@ import { useStore } from "effector-react";
 import { useState } from "react";
 
 import { ExportColumn, Option } from "data-import-wizard-utils";
-import { CQIDexie } from "../../db";
 import { mappingApi } from "../../Events";
 import { $mapping, $program } from "../../Store";
-import { record } from "zod";
 
-export default function Columns({
-    db,
-    levels,
-}: {
-    db: CQIDexie;
-    levels: Option[];
-}) {
+export default function Columns({ levels }: { levels: Option[] }) {
     const program = useStore($program);
     const mapping = useStore($mapping);
     const [active, setActive] = useState<string>("miscellaneous");
@@ -24,7 +16,12 @@ export default function Columns({
         program.programTrackedEntityAttributes?.map(
             ({ trackedEntityAttribute: { id } }) => id,
         ) ?? [];
+
     const data = [
+        {
+            id: `trackedEntityInstance`,
+            name: `Tracked Entity Instance Id`,
+        },
         {
             id: `0-enrollment`,
             name: `Enrollment Id`,
@@ -44,6 +41,13 @@ export default function Columns({
                 name: `${label} name`,
             },
         ]) ?? [],
+    );
+
+    const attributesMap: Map<string, string> = new Map(
+        program.programTrackedEntityAttributes
+            ?.map(({ trackedEntityAttribute: { id, name } }) => ({ id, name }))
+            .concat(data.map(({ id, name }) => ({ id, name })))
+            .map(({ id, name }) => [id, name]),
     );
 
     const columns: TableColumnsType<{ id: string; name: string }> = [
@@ -77,8 +81,7 @@ export default function Columns({
                                 { column: record.id, label: record.name },
                             ],
                         };
-
-                        if (!hasStage) {
+                        if (hasStage) {
                             value = value.map<ExportColumn>((column) => {
                                 if (column.column === stage.id) {
                                     let children = column.children;
@@ -100,7 +103,7 @@ export default function Columns({
                                     return {
                                         column: stage.id,
                                         label: stage.name,
-										repeatable: stage.repeatable,
+                                        repeatable: stage.repeatable,
                                         children,
                                     };
                                 }
@@ -131,7 +134,7 @@ export default function Columns({
                                 path: "columns",
                                 value: value.concat({
                                     column: stage.id,
-									repeatable: stage.repeatable,
+                                    repeatable: stage.repeatable,
                                     children,
                                     label: stage.name,
                                 }),
@@ -204,9 +207,11 @@ export default function Columns({
                                 onSelectAll: (selected) => {
                                     const removeSet =
                                         data.map(({ id }) => id) ?? [];
+
                                     let value =
                                         mapping.dhis2SourceOptions?.columns ??
                                         [];
+
                                     if (selected) {
                                         value = value
                                             .filter(
@@ -219,7 +224,9 @@ export default function Columns({
                                                 removeSet.map((id) => ({
                                                     column: id,
                                                     children: [],
-                                                    label: record.name,
+                                                    label:
+                                                        attributesMap.get(id) ??
+                                                        "",
                                                 })) ?? [],
                                             );
                                         mappingApi.update({
@@ -280,7 +287,7 @@ export default function Columns({
                                             children: [],
                                         });
                                     }
-                                    console.log(value);
+
                                     mappingApi.update({
                                         attribute: "dhis2SourceOptions",
                                         path: "columns",
@@ -298,16 +305,20 @@ export default function Columns({
                                                     column,
                                                 ) === -1,
                                         );
-
                                         mappingApi.update({
                                             attribute: "dhis2SourceOptions",
                                             path: "columns",
                                             value: value.concat(
-                                                allAttributes.map((id) => ({
-                                                    column: id,
-                                                    children: [],
-                                                    label: record.name,
-                                                })),
+                                                allAttributes.map((id) => {
+                                                    return {
+                                                        column: id,
+                                                        children: [],
+                                                        label:
+                                                            attributesMap.get(
+                                                                id,
+                                                            ) ?? "",
+                                                    };
+                                                }),
                                             ),
                                         });
                                     } else {

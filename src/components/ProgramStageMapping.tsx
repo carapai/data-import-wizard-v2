@@ -4,9 +4,11 @@ import {
     IProgramStageDataElement,
     Mapping,
     Option,
+    RealMapping,
 } from "data-import-wizard-utils";
 import { useStore } from "effector-react";
-import { ChangeEvent, useState } from "react";
+import { orderBy } from "lodash";
+import { ChangeEvent } from "react";
 import { CQIDexie } from "../db";
 import { mappingApi, stageMappingApi } from "../Events";
 import { $mapping, $metadata, $programStageMapping } from "../Store";
@@ -27,26 +29,36 @@ export default function ProgramStageMapping({
     const mapping = useStore($mapping);
     const metadata = useStore($metadata);
     const programStageMapping = useStore($programStageMapping);
-    const stageMapping: Mapping = programStageMapping[psId] ?? {};
-    const dataElements: Option[] = programStageDataElements.map(
-        ({ dataElement: { id, name, optionSetValue, optionSet } }) => {
-            return {
-                label: name,
-                value: id,
-                optionSetValue: optionSetValue || false,
-                id,
-                stage: psId,
-                availableOptions:
-                    optionSet?.options.map(({ code, id, name }) => ({
-                        label: `${name}(${code})`,
-                        code,
-                        value: code,
-                        id,
-                    })) || [],
-            };
-        },
+    const stageMapping: Mapping =
+        programStageMapping.get(psId) ??
+        new Map<string, Partial<RealMapping>>();
+    const dataElements: Option[] = orderBy(
+        programStageDataElements.map(
+            ({
+                dataElement: { id, name, optionSetValue, optionSet },
+                compulsory,
+            }) => {
+                return {
+                    label: name,
+                    value: id,
+                    optionSetValue: optionSetValue || false,
+                    id,
+                    stage: psId,
+                    mandatory: compulsory,
+                    availableOptions:
+                        optionSet?.options.map(({ code, id, name }) => ({
+                            label: name,
+                            code,
+                            value: code,
+                            id,
+                        })) || [],
+                };
+            },
+        ),
+        ["mandatory"],
+        ["desc"],
     );
-    const info = mapping.eventStageMapping?.[psId] || {};
+    const info = mapping.eventStageMapping?.get(psId) || {};
     const {
         createEvents = false,
         updateEvents = false,

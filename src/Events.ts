@@ -1,6 +1,7 @@
 import {
     AggDataValue,
     AggMetadata,
+    deleteNested,
     emptyProcessedData,
     EventStageMapping,
     GODataOption,
@@ -10,17 +11,17 @@ import {
     IProgram,
     Mapping,
     MappingEvent,
+    mapUnion,
     Option,
     Processed,
     StageMapping,
     StageUpdate,
     Step,
-    Update,
-    updateObject,
+    updateNested,
 } from "data-import-wizard-utils";
 import { createApi } from "effector";
-import { Dictionary } from "lodash";
 import { set } from "lodash/fp";
+import { MappingUpdate, Merger } from "./Interfaces";
 import {
     $activeSteps,
     $attributeMapping,
@@ -35,6 +36,7 @@ import {
     $enrollmentMapping,
     $errors,
     $excel,
+    $fhir,
     $goData,
     $goDataOptions,
     $indicators,
@@ -55,7 +57,24 @@ import {
     $tokens,
 } from "./Store";
 import { defaultMapping } from "./utils/utils";
-import { MappingUpdate, Merger } from "./Interfaces";
+
+const multiUpdate = (state: Mapping, { attribute, update }: MappingUpdate) => {
+    const newMap: Mapping = new Map(state);
+    if (!newMap.has(attribute)) {
+        newMap.set(attribute, update);
+    } else {
+        const previous = newMap.get(attribute);
+        newMap.set(attribute, { ...previous, ...update });
+    }
+
+    return newMap;
+};
+
+const deleteValue = (state: Mapping, value: string) => {
+    const newMap: Mapping = new Map(state);
+    newMap.delete(value);
+    return newMap;
+};
 
 export const mappingApi = createApi($mapping, {
     set: (_, mapping: Partial<IMapping>) => mapping,
@@ -76,19 +95,24 @@ export const mappingApi = createApi($mapping, {
             update,
         }: { stage: string; update: Partial<EventStageMapping> },
     ) => {
-        const { [stage]: current, ...rest } = state.eventStageMapping ?? {};
-
         return {
             ...state,
-            eventStageMapping: { ...rest, [stage]: { ...current, ...update } },
+            eventStageMapping: new Map(
+                new Map(state.eventStageMapping).set(stage, {
+                    ...(new Map(state.eventStageMapping).get(stage) ?? {}),
+                    ...update,
+                }),
+            ),
         };
     },
 });
 
 export const optionMappingApi = createApi($optionMapping, {
-    set: (_, value: Record<string, string>) => value,
+    set: (_, value: Map<string, string>) => value,
     add: (state, { key, value }: { key: string; value: string }) => {
-        return { ...state, [key]: value };
+        const clone: Map<string, string> = new Map(state);
+        clone.set(key, value);
+        return clone;
     },
 });
 
@@ -97,7 +121,7 @@ export const dhis2ProgramApi = createApi($dhis2Program, {
 });
 
 export const tokensApi = createApi($tokens, {
-    set: (_, values: Dictionary<string>) => values,
+    set: (_, values: Map<string, string>) => new Map(values),
 });
 
 export const tokenApi = createApi($token, {
@@ -116,7 +140,7 @@ export const conflictsApi = createApi($conflicts, {
 });
 
 export const prevGoDataApi = createApi($prevGoData, {
-    set: (_, data: Dictionary<string>) => data,
+    set: (_, data: Map<string, string>) => new Map(data),
 });
 export const goDataApi = createApi($goData, {
     set: (_, data: Partial<IGoData>) => data,
@@ -302,105 +326,70 @@ export const stageMappingApi = createApi($programStageMapping, {
     },
     set: (_, value: StageMapping) => value,
     updateMany: (state, { stage = "", update, attribute }: MappingUpdate) => {
-        const { [stage]: current, ...rest }: StageMapping = state;
-        return {
-            ...rest,
-            [stage]: {
-                ...current,
-                [attribute]: { ...(current?.[attribute] ?? {}), ...update },
-            },
-        };
+        return updateNested(new Map(state), stage, attribute, (current) => ({
+            ...current,
+            ...update,
+        }));
     },
     remove: (
         state,
         { attribute, stage }: { attribute: string; stage: string },
     ) => {
-        const { [stage]: current, ...rest } = state;
-        const { [attribute]: current2, ...rest2 } = current;
-        return { ...rest, ...{ [stage]: rest2 } };
+        return deleteNested(new Map(state), stage, attribute);
     },
     merge: (state, { mapping, stage = "" }: Merger) => {
-        const { [stage]: current, ...rest }: StageMapping = state;
-        return {
-            ...state,
-            ...rest,
-            [stage]: {
-                ...current,
-                ...mapping,
-            },
-        };
+        const clone = new Map(state);
+        const current = clone.get(stage);
+        if (current) {
+            const merger = mapUnion(current, mapping);
+            clone.set(stage, merger);
+        }
+        return clone;
     },
-    reset: () => ({}),
+    reset: (state) => state.clear(),
 });
 
 export const remoteMappingApi = createApi($remoteMapping, {
-    updateMany: (state, { attribute, update }: MappingUpdate) => {
-        return {
-            ...state,
-            ...{ [attribute]: { ...state[attribute], ...update } },
-        };
+    updateMany: (state, args: MappingUpdate) => {
+        return multiUpdate(state, args);
     },
-    reset: () => ({}),
-    merge: (state, { mapping }: Merger) => ({
-        ...state,
-        ...mapping,
-    }),
+    reset: () => new Map(),
+    merge: (state, { mapping }: Merger) => mapUnion(new Map(state), mapping),
 });
 
 export const attributeMappingApi = createApi($attributeMapping, {
     set: (_, value: Mapping) => value,
-    updateMany: (state, { attribute, update }: MappingUpdate) => {
-        return {
-            ...state,
-            ...{ [attribute]: { ...state[attribute], ...update } },
-        };
+    updateMany: (state, args: MappingUpdate) => {
+        return multiUpdate(state, args);
     },
     remove: (state, value: string) => {
-        const { [value]: current, ...rest } = state;
-        return rest;
+        return deleteValue(state, value);
     },
-    merge: (state, { mapping }: Merger) => ({
-        ...state,
-        ...mapping,
-    }),
-    reset: () => ({}),
+    merge: (state, { mapping }: Merger) => mapUnion(new Map(state), mapping),
+    reset: () => new Map(),
 });
 export const enrollmentMappingApi = createApi($enrollmentMapping, {
     set: (_, value: Mapping) => value,
-    updateMany: (state, { attribute, update }: MappingUpdate) => {
-        return {
-            ...state,
-            ...{ [attribute]: { ...state[attribute], ...update } },
-        };
+    updateMany: (state, args: MappingUpdate) => {
+        return multiUpdate(state, args);
     },
     remove: (state, value: string) => {
-        const { [value]: current, ...rest } = state;
-        return rest;
+        return deleteValue(state, value);
     },
-    reset: () => ({}),
-    merge: (state, { mapping }: Merger) => ({
-        ...state,
-        ...mapping,
-    }),
+    reset: () => new Map(),
+    merge: (state, { mapping }: Merger) => mapUnion(new Map(state), mapping),
 });
 
 export const ouMappingApi = createApi($organisationUnitMapping, {
     set: (_, value: Mapping) => value,
     remove: (state, value: string) => {
-        const { [value]: current, ...rest } = state;
-        return rest;
+        return deleteValue(state, value);
     },
-    updateMany: (state, { attribute, update }: MappingUpdate) => {
-        return {
-            ...state,
-            ...{ [attribute]: { ...state[attribute], ...update } },
-        };
+    updateMany: (state, args: MappingUpdate) => {
+        return multiUpdate(state, args);
     },
-    merge: (state, { mapping }: Merger) => ({
-        ...state,
-        ...mapping,
-    }),
-    reset: () => ({}),
+    merge: (state, { mapping }: Merger) => mapUnion(new Map(state), mapping),
+    reset: (state) => state.clear(),
 });
 
 export const remoteOrganisationsApi = createApi($remoteOrganisations, {
@@ -448,17 +437,14 @@ export const invalidDataApi = createApi($invalidData, {
 
 export const attributionMappingApi = createApi($attributionMapping, {
     set: (_, value: Mapping) => value,
-    updateMany: (state, { attribute, update }: MappingUpdate) => {
-        return {
-            ...state,
-            ...{ [attribute]: { ...state[attribute], ...update } },
-        };
+    updateMany: (state, args: MappingUpdate) => {
+        return multiUpdate(state, args);
     },
-    merge: (state, { mapping }: Merger) => ({
-        ...state,
-        ...mapping,
-    }),
-    reset: () => ({}),
+    remove: (state, value: string) => {
+        return deleteValue(state, value);
+    },
+    merge: (state, { mapping }: Merger) => mapUnion(new Map(state), mapping),
+    reset: () => new Map(),
 });
 
 export const metadataApi = createApi($metadata, {
@@ -470,4 +456,16 @@ export const metadataApi = createApi($metadata, {
 
 export const excelApi = createApi($excel, {
     add: (state, data: any[]) => state.concat(data),
+});
+
+export const fhirApi = createApi($fhir, {
+    setConcepts: (state, value: any[]) => ({ ...state, concepts: value }),
+    changeLabelColumn: (state, value: string) => ({
+        ...state,
+        labelColumn: value,
+    }),
+    changeValueColumn: (state, value: string) => ({
+        ...state,
+        valueColumn: value,
+    }),
 });

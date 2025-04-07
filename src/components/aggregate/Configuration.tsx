@@ -26,7 +26,8 @@ export default function Configuration({ db }: { db: CQIDexie }) {
                     title="Header row"
                     attribute="headerRow"
                     key="header-row"
-                    callback={() => {
+                    value={mapping.headerRow}
+                    onChange={() => {
                         if (workbook && mapping.sheet) {
                             const actual = generateData(
                                 mapping,
@@ -46,7 +47,8 @@ export default function Configuration({ db }: { db: CQIDexie }) {
                     title="Data start row"
                     attribute="dataStartRow"
                     key="data-start-row"
-                    callback={() => {
+                    value={mapping.dataStartRow}
+                    onChange={() => {
                         if (workbook && mapping.sheet) {
                             const actual = generateData(
                                 mapping,
@@ -103,10 +105,9 @@ export default function Configuration({ db }: { db: CQIDexie }) {
             element: (
                 <SelectField
                     title="Attribute option combo column"
-                    attribute="aggregate"
+                    attribute="attributeOptionComboColumn"
                     options={metadata.sourceColumns}
                     multiple={false}
-                    path="attributeOptionComboColumn"
                     key="aoc-column"
                 />
             ),
@@ -129,24 +130,21 @@ export default function Configuration({ db }: { db: CQIDexie }) {
             element: (
                 <Stack spacing="30px" key="attribution">
                     <Checkbox
-                        isChecked={mapping.aggregate?.attributionMerged}
+                        isChecked={mapping.attributionMerged}
                         onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                            mappingApi.update({
-                                attribute: "aggregate",
-                                value: e.target.checked,
-                                path: "attributionMerged",
+                            mappingApi.updateMany({
+                                attributionMerged: e.target.checked,
                             })
                         }
                     >
                         Data Set Attribution merged
                     </Checkbox>
-                    {mapping.aggregate?.attributionMerged ? (
+                    {mapping.attributionMerged ? (
                         <SelectField
                             title="Attribute option combo column"
-                            attribute="aggregate"
+                            attribute="attributeOptionComboColumn"
                             options={metadata.sourceColumns}
                             multiple={false}
-                            path="attributeOptionComboColumn"
                         />
                     ) : (
                         <Stack

@@ -67,44 +67,55 @@ export default function RemoteOutbreaks({ db }: { db: CQIDexie }) {
             ? { destination: outbreak.name }
             : { source: outbreak.name };
         onOpen();
-        if (!programMapping.isSource) {
-            // mappingApi.updateMany({
-            //     orgUnitColumn: "addresses[0].locationId",
-            //     customOrgUnitColumn: true,
-            //     program: {
-            //         ...programMapping.program,
-            //         createEnrollments: true,
-            //         createEntities: true,
-            //         updateEntities: true,
-            //         incidentDateColumn: "dateOfOnset",
-            //         enrollmentDateColumn: "dateOfOnset",
-            //         remoteProgram: outbreak.id,
-            //     },
-            // });
-        } else {
-            mappingApi.updateMany({
-                program: {
-                    ...programMapping.program,
-                    remoteProgram: outbreak.id,
-                    ...other,
-                },
-            });
-        }
-
+        mappingApi.updateMany({
+            program: {
+                ...programMapping.program,
+                remoteProgram: outbreak.id,
+                ...other,
+            },
+        });
+        await db.messages.put({
+            message: "Loading Go.Data Hierarchy...",
+            id: 1,
+        });
         const hierarchy = await fetchGoDataHierarchy(
             {
                 ...programMapping.authentication,
-                params: { auth: { param: "access_token", value: token } },
+                params: new Map([
+                    [
+                        "auth",
+                        {
+                            param: "access_token",
+                            value: token,
+                        },
+                    ],
+                ]),
             },
             outbreak.locationIds,
         );
+        await db.messages.put({
+            message: "Loading Go.Data Reference Data...",
+            id: 1,
+        });
         const goDataOptions = await fetchRemote<GODataOption[]>(
             {
                 ...programMapping.authentication,
-                params: { auth: { param: "access_token", value: token } },
+                params: new Map([
+                    [
+                        "auth",
+                        {
+                            param: "access_token",
+                            value: token,
+                        },
+                    ],
+                ]),
             },
             "api/reference-data",
         );
+        await db.messages.put({
+            message: "Loading Go.Data Language Tokens...",
+            id: 1,
+        });
         const tokens = await fetchRemote<{
             languageId: string;
             lastUpdateDate: string;
@@ -112,7 +123,15 @@ export default function RemoteOutbreaks({ db }: { db: CQIDexie }) {
         }>(
             {
                 ...programMapping.authentication,
-                params: { auth: { param: "access_token", value: token } },
+                params: new Map([
+                    [
+                        "auth",
+                        {
+                            param: "access_token",
+                            value: token,
+                        },
+                    ],
+                ]),
             },
             "api/languages/english_us/language-tokens",
         );
@@ -121,7 +140,7 @@ export default function RemoteOutbreaks({ db }: { db: CQIDexie }) {
             tokens.tokens.map(({ token, translation }) => [token, translation]),
         );
 
-        tokensApi.set(allTokens);
+        tokensApi.set(new Map(Object.entries(allTokens)));
         goDataOptionsApi.set(
             goDataOptions.filter(({ deleted }) => deleted === false),
         );

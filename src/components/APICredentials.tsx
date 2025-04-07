@@ -36,7 +36,7 @@ const AddableValues = ({
     const mapping = useStore($mapping);
     const authentication: Partial<Authentication> =
         (mapping[accessor] as Partial<Authentication>) ?? {};
-    const vals = authentication[attribute] ?? {};
+    const vals = authentication[attribute] ?? new Map();
     return (
         <Table size="sm">
             <Thead>
@@ -50,7 +50,7 @@ const AddableValues = ({
                 </Tr>
             </Thead>
             <Tbody>
-                {Object.entries(vals).map(
+                {Array.from(vals.entries()).map(
                     ([parameter, { param, value, forUpdates }]) => (
                         <Tr key={parameter}>
                             <Td>

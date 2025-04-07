@@ -1,12 +1,12 @@
 import {
-    Box,
-    Stack,
-    Tab,
-    TabList,
-    TabPanel,
-    TabPanels,
-    Tabs,
-    Text,
+	Box,
+	Stack,
+	Tab,
+	TabList,
+	TabPanel,
+	TabPanels,
+	Tabs,
+	Text
 } from "@chakra-ui/react";
 import { GroupBase, Select } from "chakra-react-select";
 import { Option } from "data-import-wizard-utils";
@@ -16,16 +16,6 @@ import { CQIDexie } from "../../db";
 import { attributeMappingApi, mappingApi } from "../../Events";
 import { $attributeMapping, $mapping, $metadata } from "../../Store";
 import GenericMapping from "../GenericMapping";
-
-// const Display = ({ data, db }: { data: Option[]; db: CQIDexie }) => {
-//     const metadata = useStore($metadata);
-
-//     return (
-//         <Stack>
-
-//         </Stack>
-//     );
-// };
 
 export function OtherSystemMapping({ db }: { db: CQIDexie }) {
     const metadata = useStore($metadata);
@@ -48,7 +38,7 @@ export function OtherSystemMapping({ db }: { db: CQIDexie }) {
     }, []);
     if (mapping.dataSource === "go-data") {
         return (
-            <Stack>
+            <Stack w="100%" h="100%">
                 <Stack direction="row" alignItems="center">
                     <Text>Entity</Text>
                     <Box flex={1}>
@@ -91,7 +81,6 @@ export function OtherSystemMapping({ db }: { db: CQIDexie }) {
                             )}
                             <Tab>Lab</Tab>
                         </TabList>
-
                         <TabPanels>
                             <TabPanel>
                                 <GenericMapping

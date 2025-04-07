@@ -1,7 +1,7 @@
 import { Box, Input, useToast } from "@chakra-ui/react";
 import { Select } from "antd";
 import { Mapping, Option, RealMapping } from "data-import-wizard-utils";
-import { ChangeEvent } from "react";
+import { ChangeEvent, useEffect } from "react";
 import useDebouncedResize from "../hooks/useDebouncedResize";
 import { calculateWidth } from "../utils/utils";
 import CustomColumn from "./CustomColumn";
@@ -23,14 +23,22 @@ export default function FieldMapper({
     const { width } = useDebouncedResize();
     const toast = useToast();
     const { value = "" } = option;
-    const item = mapped?.[value] ?? {};
-
+    const item = mapped.get(value) ?? {};
     const {
         customType = "",
         isSpecific = false,
         isCustom = false,
         source = "",
     } = item;
+    useEffect(() => {
+        if (option.mandatory && option.unique) {
+            onValueChange({ ...item, mandatory: true, unique: true });
+        } else if (option.mandatory) {
+            onValueChange({ ...item, mandatory: true });
+        } else if (option.unique) {
+            onValueChange({ ...item, unique: true });
+        }
+    }, []);
 
     if (isCustom)
         return (

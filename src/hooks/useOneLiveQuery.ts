@@ -1,4 +1,3 @@
-import { Mapping, RealMapping } from "data-import-wizard-utils";
 import { PromiseExtended } from "dexie";
 import { useLiveQuery } from "dexie-react-hooks";
 import React from "react";

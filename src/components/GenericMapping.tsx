@@ -41,26 +41,26 @@ export default function GenericMapping({
     isOrgUnitMapping?: boolean;
 }) {
     const { width } = useDebouncedResize();
-
     const mapping = useStore($mapping);
     const { source, destination } = useStore($names);
     const [attributes, setAttributes] = useState(destinationOptions);
     const [searchString, setSearchString] = useState<string>("");
     const { matchHierarchy = false } = mapping.orgUnitMapping ?? {};
-    const mappedValues = attributes.flatMap(({ source }) => {
+    const mappedValues = attributes?.flatMap(({ source }) => {
         if (source) {
             return source;
         }
         return [];
     });
 
+    console.log(mappedValues);
     const columns: ColumnsType<Option> = useMemo(
         () => [
             {
                 title: (
                     <Stack direction="row" alignItems="center">
                         <DestinationIcon mapping={mapping} />
-                        <Text> Destination Attribute</Text>
+                        <Text>Destination:</Text>
                         <Text>{destination}</Text>
                     </Stack>
                 ),
@@ -93,7 +93,7 @@ export default function GenericMapping({
                 align: "center",
                 width: `${smallestWidth}px`,
                 render: (_, { value = "", mandatory }) => {
-                    const currentValue = mapped?.[value]?.mandatory ?? false;
+                    const currentValue = mapped.get(value)?.mandatory ?? false;
                     return (
                         <Box
                             w={`${smallestWidth}px`}
@@ -101,7 +101,7 @@ export default function GenericMapping({
                             minW={`${smallestWidth}px`}
                         >
                             <Checkbox
-                                isChecked={currentValue}
+                                isChecked={currentValue || mandatory}
                                 isReadOnly={mandatory}
                                 onChange={(
                                     e: ChangeEvent<HTMLInputElement>,
@@ -130,8 +130,8 @@ export default function GenericMapping({
                 key: "unique",
                 width: `${smallestWidth}px`,
                 align: "center",
-                render: (_, { unique, value = "" }) => {
-                    const currentValue = mapped?.[value]?.unique ?? false;
+                render: (_, { unique = false, value = "" }) => {
+                    const currentValue = mapped.get(value)?.unique ?? false;
                     return (
                         <Box
                             w={`${smallestWidth}px`}
@@ -139,7 +139,7 @@ export default function GenericMapping({
                             minW={`${smallestWidth}px`}
                         >
                             <Checkbox
-                                isChecked={currentValue}
+                                isChecked={currentValue || unique}
                                 isReadOnly={unique}
                                 onChange={(
                                     e: ChangeEvent<HTMLInputElement>,
@@ -169,7 +169,7 @@ export default function GenericMapping({
                 width: `${smallestWidth}px`,
                 align: "center",
                 render: (_, { value = "" }) => {
-                    const currentValue = mapped?.[value]?.isCustom ?? false;
+                    const currentValue = mapped.get(value)?.isCustom ?? false;
                     return (
                         <Box
                             w={`${smallestWidth}px`}
@@ -209,7 +209,7 @@ export default function GenericMapping({
                 width: `${smallestWidth}px`,
                 align: "center",
                 render: (_, { value = "" }) => {
-                    const currentValue = mapped?.[value]?.isSpecific ?? false;
+                    const currentValue = mapped.get(value)?.isSpecific ?? false;
                     return (
                         <Checkbox
                             isChecked={currentValue}
@@ -231,7 +231,7 @@ export default function GenericMapping({
                 title: (
                     <Stack direction="row" alignItems="center">
                         <SourceIcon mapping={mapping} />
-                        <Text>Source Attribute</Text>
+                        <Text>Source:</Text>
                         <Text>{source}</Text>
                     </Stack>
                 ),
@@ -250,7 +250,7 @@ export default function GenericMapping({
                                 updater({
                                     attribute: value,
                                     stage,
-                                    update: { source: val.source },
+                                    update: { ...val, source: val.source },
                                 });
                             }}
                         />
@@ -268,14 +268,14 @@ export default function GenericMapping({
                     </Box>
                 ),
                 key: "value",
-				align: "center",
+                align: "center",
                 width: `${mediumWidth}px`,
                 render: (
                     _,
-                    { value = "", optionSetValue, availableOptions, valueType },
+                    { value = "", optionSetValue, availableOptions },
                 ) => {
                     const { source = "", format = "YYYY-MM-DD" } =
-                        mapped[value] ?? {};
+                        mapped.get(value) ?? {};
                     if (optionSetValue) {
                         return (
                             <OptionSetMapping
@@ -326,46 +326,55 @@ export default function GenericMapping({
         ],
     );
     return (
-        <Stack>
-            <AutoMap
-                destinationOptions={attributes}
-                sourceOptions={sourceOptions}
-                db={db}
-                mapped={mapped}
-                onFinishSearch={(processed) => {
-                    merger({ mapping: processed, stage });
-                }}
-                isOrgUnitMapping={isOrgUnitMapping}
-            />
-            <Search
-                destinationOptions={destinationOptions}
-                sourceOptions={sourceOptions}
-                mapping={mapped}
-                searchString={searchString}
-                setSearchString={setSearchString}
-                action={setAttributes}
-                placeholder="Search attributes"
-                label="Show Mapped Only"
-                label2="Show Unmapped Only"
-                label3="View Unmapped Source Data"
-            />
+        <Stack w="100%" h="100%">
+            <Stack direction="row" alignItems="center" w="100%">
+                <AutoMap
+                    destinationOptions={attributes}
+                    sourceOptions={sourceOptions}
+                    db={db}
+                    mapped={mapped}
+                    onFinishSearch={(processed) => {
+                        merger({ mapping: processed, stage });
+                    }}
+                    isOrgUnitMapping={isOrgUnitMapping}
+                />
+                <Search
+                    destinationOptions={destinationOptions}
+                    sourceOptions={sourceOptions}
+                    mapping={mapped}
+                    searchString={searchString}
+                    setSearchString={setSearchString}
+                    action={setAttributes}
+                    placeholder="Search attributes"
+                    label="Show Mapped Only"
+                    label2="Show Unmapped Only"
+                    label3="View Unmapped Source Data"
+                />
+            </Stack>
 
             <Table
                 columns={columns}
-                virtual={false}
                 dataSource={attributes}
                 rowKey="value"
-                pagination={{ pageSize: 8, hideOnSinglePage: true }}
+                pagination={{ pageSize: 5, hideOnSinglePage: true }}
                 size="middle"
                 footer={() => (
                     <Text textAlign="right">
                         <>
-                            Mapped {findMapped(Object.values(mapped))} of{" "}
+                            Mapped {findMapped(Array.from(mapped.values()))} of{" "}
                             {attributes?.length ?? 0}
                         </>
                     </Text>
                 )}
             />
+
+            <pre>
+                {JSON.stringify(
+                    findMapped(Array.from(mapped.values())),
+                    null,
+                    2,
+                )}
+            </pre>
         </Stack>
     );
 }

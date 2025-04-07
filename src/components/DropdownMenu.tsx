@@ -27,6 +27,7 @@ import { BiDotsVerticalRounded } from "react-icons/bi";
 import { CQIDexie } from "../db";
 import {
     attributeMappingApi,
+    attributionMappingApi,
     currentSourceOptionsApi,
     dataSetApi,
     dhis2DataSetApi,
@@ -49,6 +50,7 @@ import DataImportSummary from "./DataImportSummary";
 import DataPreview from "./DataPreview";
 import ImportExportOptions from "./ImportExportOptions";
 import SwitchComponent, { Case } from "./SwitchComponent";
+import { isFileBasedMapping } from "../utils/utils";
 
 export default function DropdownMenu({
     id,
@@ -93,7 +95,7 @@ export default function DropdownMenu({
                 attributeMapping,
                 organisationUnitMapping,
                 optionMapping,
-				attributionMapping
+                attributionMapping,
             } = await getPreviousProgramMapping(
                 { engine },
                 mapping,
@@ -146,16 +148,7 @@ export default function DropdownMenu({
         setOptionsDialogOpen(() => false);
     };
     const runDataSet = async (mapping: Partial<IMapping>) => {
-        if (
-            mapping.dataSource &&
-            [
-                "csv-line-list",
-                "xlsx-line-list",
-                "xlsx-tabular-data",
-                "xlsx-form",
-                "json",
-            ].indexOf(mapping.dataSource) !== -1
-        ) {
+        if (mapping.dataSource && isFileBasedMapping(mapping)) {
             setAction(() => "previewing");
         } else {
             if (mapping.prefetch) {
@@ -233,7 +226,22 @@ export default function DropdownMenu({
             ["iw-mapping"],
             id,
         );
-        const mapping: Partial<IMapping> = previousMappings["iw-mapping"] ?? {};
+        let mapping: Partial<IMapping> = {};
+
+        if (!isEmpty(previousMappings)) {
+            const { eventStageMapping, categoryColumns, ...rest } =
+                previousMappings["iw-mapping"];
+            mapping = {
+                ...rest,
+                eventStageMapping: eventStageMapping
+                    ? new Map(Object.entries(eventStageMapping))
+                    : new Map(),
+                categoryColumns: categoryColumns
+                    ? new Map(Object.entries(categoryColumns))
+                    : new Map(),
+            };
+        }
+
         const {
             programStageMapping,
             attributeMapping,
@@ -260,15 +268,18 @@ export default function DropdownMenu({
         attributeMappingApi.set(attributeMapping);
         enrollmentMappingApi.set(enrollmentMapping);
         stageMappingApi.set(programStageMapping);
+        attributionMappingApi.set(attributionMapping);
         if (mapping.type === "individual") {
             programApi.set(program);
-            optionMappingApi.set(optionMapping);
+            optionMappingApi.set(new Map(Object.entries(optionMapping)));
             dhis2ProgramApi.set(remoteProgram);
             if (!isEmpty(program)) {
-                mappingApi.update({
-                    attribute: "program",
-                    path: "isTracker",
-                    value: program.registration,
+                mappingApi.updateMany({
+                    program: {
+                        ...mapping.program,
+                        isTracker: program.registration,
+                        onlyEnrollOnce: program.onlyEnrollOnce,
+                    },
                 });
             }
 
@@ -292,7 +303,7 @@ export default function DropdownMenu({
                 const { options, outbreak, tokens, goDataOptions, hierarchy } =
                     await loadPreviousGoData(token, mapping);
                 goDataApi.set(outbreak);
-                tokensApi.set(tokens);
+                tokensApi.set(new Map(Object.entries(tokens)));
                 goDataOptionsApi.set(goDataOptions);
                 currentSourceOptionsApi.set(options);
                 remoteOrganisationsApi.set(
@@ -309,9 +320,6 @@ export default function DropdownMenu({
         } else if (mapping.type === "aggregate") {
             dataSetApi.set(dataSet);
             dhis2DataSetApi.set(remoteDataSet);
-            await db.attributionMapping.bulkPut(
-                Object.values(attributionMapping),
-            );
         }
         return mapping;
     };
@@ -403,7 +411,7 @@ export default function DropdownMenu({
             </Menu>
 
             <Modal
-                title="Basic Modal"
+                title="Data Exchange"
                 open={optionsDialogOpen}
                 onOk={handleOptionsOk}
                 onCancel={handleOptionsCancel}
@@ -427,7 +435,6 @@ export default function DropdownMenu({
                 open={open}
                 onOk={handleOk}
                 onCancel={handleCancel}
-                width="75%"
             >
                 <Stack>
                     <Text>New name</Text>
@@ -440,83 +447,6 @@ export default function DropdownMenu({
                     />
                 </Stack>
             </Modal>
-
-            {/* <Modal
-                isOpen={optionsDialogOpen}
-                onClose={() => setOptionsDialogOpen(() => false)}
-                isCentered
-                autoFocus
-                size="6xl"
-                scrollBehavior="inside"
-            >
-                <ModalOverlay />
-                <ModalContent>
-                    <ModalHeader>Options</ModalHeader>
-                    <ModalCloseButton />
-                    <ModalBody></ModalBody>
-
-                    <ModalFooter>
-                        <Stack
-                            direction="row"
-                            spacing="20px"
-                            justifyContent="flex-end"
-                            key="Buttons"
-                        >
-                            <Button
-                                onClick={handleOptionsCancel}
-                                colorScheme="red"
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                isLoading={
-                                    action === "uploading" &&
-                                    responses &&
-                                    responses.length > 0
-                                }
-                                onClick={handleOptionsOk}
-                                colorScheme="green"
-                            >
-                                OK
-                            </Button>
-                        </Stack>
-                    </ModalFooter>
-                </ModalContent>
-            </Modal> */}
-
-            {/* <Modal
-                isOpen={open}
-                onClose={() => setOpen(() => false)}
-                isCentered
-                autoFocus
-            >
-                <ModalOverlay />
-                <ModalContent>
-                    <ModalHeader>Set mapping name</ModalHeader>
-                    <ModalCloseButton />
-                    <ModalBody></ModalBody>
-
-                    <ModalFooter>
-                        <Stack
-                            direction="row"
-                            spacing="20px"
-                            justifyContent="flex-end"
-                            key="Buttons"
-                        >
-                            <Button onClick={handleCancel} colorScheme="red">
-                                Cancel
-                            </Button>
-                            <Button
-                                isLoading={loading}
-                                onClick={handleOk}
-                                colorScheme="green"
-                            >
-                                Clone
-                            </Button>
-                        </Stack>
-                    </ModalFooter>
-                </ModalContent>
-            </Modal> */}
         </>
     );
 }

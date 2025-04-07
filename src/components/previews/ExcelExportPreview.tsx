@@ -1,25 +1,13 @@
 import { Table, TableColumnsType } from "antd";
-import { Option } from "data-import-wizard-utils";
 import { useStore } from "effector-react";
 import { maxBy, range } from "lodash";
-import { CQIDexie } from "../../db";
-
 import { $mapping, $processed, $program } from "../../Store";
 
-const { Column, ColumnGroup } = Table;
-
-export default function ExcelExportPreview({
-    db,
-    levels,
-}: {
-    db: CQIDexie;
-    levels: Option[];
-}) {
+export default function ExcelExportPreview() {
     const program = useStore($program);
     const mapping = useStore($mapping);
     const processed = useStore($processed);
     const columns = mapping.dhis2SourceOptions?.columns || [];
-
     if (!processed.processedData || processed.processedData.length === 0) {
         return <div>No data</div>;
     }
@@ -30,29 +18,35 @@ export default function ExcelExportPreview({
             return a;
         }, {}) ?? {};
 
-    const dataColumns: TableColumnsType<any> = columns.map((parent) => {
-        const totalEvents = stagesMax[parent.column] ?? 1;
-        let children: TableColumnsType<any> = [];
-        if (parent.children.length > 0) {
-            children = range(totalEvents).map((d) => {
-                return {
-                    title: `${d + 1}`,
-                    key: parent.column,
-                    children: parent.children.map((child) => ({
+    const dataColumns: TableColumnsType<Record<string, string>> = columns.map(
+        (parent) => {
+            const totalEvents = stagesMax[parent.column] ?? 1;
+            let children: TableColumnsType<Record<string, string>> = [];
+            if (parent.children.length > 0) {
+                if (parent.repeatable) {
+                    children = range(totalEvents).flatMap((d) => {
+                        return parent.children.map((child) => ({
+                            title: `#${d + 1} ${child.label}`,
+                            dataIndex: `0-${parent.column}-${child.column}-${d}`,
+                            key: `${child.column}-${d}`,
+                        }));
+                    });
+                } else {
+                    children = parent.children.map((child) => ({
                         title: child.label,
-                        dataIndex: `0-${parent.column}-${child.column}-${d}`,
+                        dataIndex: `0-${parent.column}-${child.column}-0`,
                         key: child.column,
-                    })),
-                };
-            });
-        }
-        return {
-            title: parent.label,
-            dataIndex: parent.column,
-            key: parent.column,
-            children,
-        };
-    });
+                    }));
+                }
+            }
+            return {
+                title: parent.label,
+                dataIndex: parent.column,
+                key: parent.column,
+                children,
+            };
+        },
+    );
 
     return (
         <Table

@@ -20,10 +20,22 @@ export default function AttributeMapping({ db }: { db: CQIDexie }) {
         geometryColumn = "",
     } = mapping.trackedEntityMapping ?? {};
 
+    const {
+        customEnrollmentDateColumn = false,
+        enrollmentDateColumn = "",
+        createEnrollments = false,
+        updateEnrollments = false,
+        enrollmentIdColumn = "",
+        customEnrollmentIdColumn = false,
+        customIncidentDateColumn = false,
+        incidentDateColumn = "",
+        customGeometryColumn: customEnrollmentGeometryColumn = false,
+        geometryColumn: enrollmentGeometryColumn = "",
+    } = mapping.enrollmentMapping ?? {};
     return (
         <Stack
-            h="calc(100vh - 350px)"
-            maxH="calc(100vh - 350px)"
+            h="calc(100vh - 320px)"
+            maxH="calc(100vh - 320px)"
             overflow="auto"
             spacing="25px"
         >
@@ -76,6 +88,100 @@ export default function AttributeMapping({ db }: { db: CQIDexie }) {
                             }}
                         />
                     )}
+
+                <InfoMapping
+                    value={enrollmentIdColumn}
+                    isChecked={customEnrollmentIdColumn}
+                    title="Enrollment ID Column"
+                    title2="Custom Enrollment ID Column"
+                    onCustomChange={(customEnrollmentIdColumn) => {
+                        mappingApi.updateMany({
+                            enrollmentMapping: {
+                                ...mapping.enrollmentMapping,
+                                customEnrollmentIdColumn,
+                            },
+                        });
+                    }}
+                    onValueChange={(enrollmentIdColumn) => {
+                        mappingApi.updateMany({
+                            enrollmentMapping: {
+                                ...mapping.enrollmentMapping,
+                                enrollmentIdColumn,
+                            },
+                        });
+                    }}
+                />
+
+                <InfoMapping
+                    value={enrollmentDateColumn}
+                    isChecked={customEnrollmentDateColumn}
+                    title="Enrollment Date Column"
+                    title2="Custom Enrollment Date Column"
+                    onCustomChange={(customEnrollmentDateColumn) => {
+                        mappingApi.updateMany({
+                            enrollmentMapping: {
+                                ...mapping.enrollmentMapping,
+                                customEnrollmentDateColumn,
+                            },
+                        });
+                    }}
+                    onValueChange={(enrollmentDateColumn) => {
+                        mappingApi.updateMany({
+                            enrollmentMapping: {
+                                ...mapping.enrollmentMapping,
+                                enrollmentDateColumn,
+                            },
+                        });
+                    }}
+                />
+                <InfoMapping
+                    value={incidentDateColumn}
+                    isChecked={customIncidentDateColumn}
+                    title="Incident Column"
+                    title2="Custom Incident Column"
+                    onCustomChange={(customIncidentDateColumn) => {
+                        mappingApi.updateMany({
+                            enrollmentMapping: {
+                                ...mapping.enrollmentMapping,
+                                customIncidentDateColumn,
+                            },
+                        });
+                    }}
+                    onValueChange={(incidentDateColumn) => {
+                        mappingApi.updateMany({
+                            enrollmentMapping: {
+                                ...mapping.enrollmentMapping,
+                                incidentDateColumn,
+                            },
+                        });
+                    }}
+                />
+                {program.featureType !== "NONE" &&
+                    program.featureType !== undefined && (
+                        <InfoMapping
+                            value={enrollmentGeometryColumn}
+                            isChecked={customEnrollmentGeometryColumn}
+                            title="Geometry Column"
+                            title2="Custom Geometry Column"
+                            onCustomChange={(customGeometryColumn) => {
+                                mappingApi.updateMany({
+                                    enrollmentMapping: {
+                                        ...mapping.enrollmentMapping,
+                                        customGeometryColumn,
+                                    },
+                                });
+                            }}
+                            onValueChange={(geometryColumn) => {
+                                mappingApi.updateMany({
+                                    enrollmentMapping: {
+                                        ...mapping.enrollmentMapping,
+                                        geometryColumn,
+                                    },
+                                });
+                            }}
+                            isMulti
+                        />
+                    )}
             </Stack>
             <Stack spacing={[1, 5]} direction={["column", "row"]}>
                 <Checkbox
@@ -107,10 +213,38 @@ export default function AttributeMapping({ db }: { db: CQIDexie }) {
                 >
                     Update Entities
                 </Checkbox>
-            </Stack>
+                <Checkbox
+                    colorScheme="green"
+                    isChecked={createEnrollments}
+                    onChange={(e) => {
+                        mappingApi.updateMany({
+                            enrollmentMapping: {
+                                ...mapping.enrollmentMapping,
+                                createEnrollments: e.target.checked,
+                            },
+                        });
+                    }}
+                >
+                    Create Enrollments
+                </Checkbox>
 
+                <Checkbox
+                    colorScheme="green"
+                    isChecked={updateEnrollments}
+                    onChange={(e) => {
+                        mappingApi.updateMany({
+                            enrollmentMapping: {
+                                ...mapping.enrollmentMapping,
+                                updateEnrollments: e.target.checked,
+                            },
+                        });
+                    }}
+                >
+                    Update Enrollments
+                </Checkbox>
+            </Stack>
             <GenericMapping
-                destinationOptions={metadata.destinationAttributes}
+                destinationOptions={metadata.destinationTrackedEntityAttributes}
                 sourceOptions={metadata.sourceColumns}
                 mapped={attributeMapping}
                 updater={attributeMappingApi.updateMany}

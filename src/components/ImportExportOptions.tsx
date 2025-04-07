@@ -27,7 +27,6 @@ export default function ImportExportOptions({
                     "fhir",
                 ].indexOf(String(mapping.dataSource)) !== -1 && (
                     <InitialMapping
-                        isSource={mapping.isSource}
                         dataSource={mapping.dataSource}
                         extraction={
                             mapping.useColumnLetters ? "column" : undefined

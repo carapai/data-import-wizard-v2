@@ -1,6 +1,5 @@
-import { Box, Checkbox, Input, Stack, Text } from "@chakra-ui/react";
+import { Checkbox, Input, Stack, Text } from "@chakra-ui/react";
 import { Select } from "antd";
-import { Option } from "data-import-wizard-utils";
 import { useStore } from "effector-react";
 import { ChangeEvent } from "react";
 import { $mapping, $metadata } from "../Store";

@@ -1,7 +1,7 @@
 import { Stack, Text, useToast } from "@chakra-ui/react";
 import { useDataEngine } from "@dhis2/app-runtime";
 import { useNavigate } from "@tanstack/react-location";
-import { Option, Step } from "data-import-wizard-utils";
+import { isExcel, Option, Step } from "data-import-wizard-utils";
 import { useStore } from "effector-react";
 import { LocationGenerics } from "../Interfaces";
 
@@ -9,30 +9,31 @@ import { CQIDexie } from "../db";
 import { activeStepsApi, mappingApi, processor } from "../Events";
 import { useOneLiveQuery } from "../hooks/useOneLiveQuery";
 import {
-	$action,
-	$attributeMapping,
-	$data,
-	$dhis2Program,
-	$disabled,
-	$enrollmentMapping,
-	$goData,
-	$goDataOptions,
-	$mapping,
-	$name,
-	$names,
-	$optionMapping,
-	$organisationUnitMapping,
-	$otherName,
-	$prevGoData,
-	$processed,
-	$program,
-	$programStageMapping,
-	$programTypes,
-	$steps,
-	$token,
-	$tokens,
-	actionApi,
-	stepper
+    $action,
+    $attributeMapping,
+    $attributionMapping,
+    $data,
+    $dhis2Program,
+    $disabled,
+    $enrollmentMapping,
+    $goData,
+    $goDataOptions,
+    $mapping,
+    $name,
+    $names,
+    $optionMapping,
+    $organisationUnitMapping,
+    $otherName,
+    $prevGoData,
+    $processed,
+    $program,
+    $programStageMapping,
+    $programTypes,
+    $steps,
+    $token,
+    $tokens,
+    actionApi,
+    stepper,
 } from "../Store";
 import { saveMapping } from "../utils/utils";
 import DataPreview from "./DataPreview";
@@ -50,6 +51,7 @@ import RemoteOutbreaks from "./RemoteOutbreak";
 import RemoteProgramSelect from "./RemoteProgramSelect";
 import StepperButtons from "./StepperButtons";
 import StepsDisplay from "./StepsDisplay";
+import Attribution from "./aggregate/Attribution";
 
 const importTypes: Option[] = [
     { value: "dhis2-program", label: "dhis2-program" },
@@ -75,6 +77,7 @@ const Program = ({ db }: { db: CQIDexie }) => {
     const optionMapping = useStore($optionMapping);
     const organisationUnitMapping = useStore($organisationUnitMapping);
     const enrollmentMapping = useStore($enrollmentMapping);
+    const attributionMapping = useStore($attributionMapping);
     const attributeMapping = useStore($attributeMapping);
     const programStageMapping = useStore($programStageMapping);
     const navigate = useNavigate<LocationGenerics>();
@@ -104,6 +107,7 @@ const Program = ({ db }: { db: CQIDexie }) => {
                 programStageMapping,
                 enrollmentMapping,
                 optionMapping,
+                attributionMapping,
             },
         });
 
@@ -183,6 +187,7 @@ const Program = ({ db }: { db: CQIDexie }) => {
             id: 7,
             lastLabel: "Go to Mappings",
         },
+
         {
             label: "System Mapping",
             content: <OtherSystemMapping db={db} />,
@@ -191,19 +196,19 @@ const Program = ({ db }: { db: CQIDexie }) => {
             lastLabel: "Go to Mappings",
         },
         {
-            label: "Attribute Mapping",
+            label: "Attribute/Enrollment Mapping",
             content: <AttributeMapping db={db} />,
             nextLabel: "Next Step",
             id: 9,
             lastLabel: "Go to Mappings",
         },
-        {
-            label: "Enrollment Mapping",
-            content: <EnrollmentMapping db={db} />,
-            nextLabel: "Next Step",
-            id: 15,
-            lastLabel: "Go to Mappings",
-        },
+        // {
+        //     label: "Enrollment Mapping",
+        //     content: <EnrollmentMapping db={db} />,
+        //     nextLabel: "Next Step",
+        //     id: 15,
+        //     lastLabel: "Go to Mappings",
+        // },
         {
             label: "Events Mapping",
             content: <EventMapping db={db} />,
@@ -211,10 +216,17 @@ const Program = ({ db }: { db: CQIDexie }) => {
             id: 10,
             lastLabel: "Go to Mappings",
         },
+        {
+            label: "Attribution Mapping",
+            content: <Attribution db={db} />,
+            lastLabel: "",
+            nextLabel: "Next Step",
+            id: 17,
+        },
 
         {
             label: "Columns",
-            content: <Columns db={db} levels={levels} />,
+            content: <Columns levels={levels} />,
             nextLabel: "Next Step",
             id: 16,
             lastLabel: "Go to Mappings",
@@ -253,54 +265,122 @@ const Program = ({ db }: { db: CQIDexie }) => {
     const activeSteps = () => {
         const preview = mapping.prefetch ? [12] : [];
         const noPreview = mapping.prefetch ? [] : [12];
+        const hasAttribution = mapping.hasAttribution ? [17] : [];
+        const hasNoAttribution = mapping.hasAttribution ? [] : [17];
+        const orgStep =
+            mapping.program?.createEntities ||
+            mapping.program?.createEnrollments ||
+            mapping.program?.createEvents
+                ? [7]
+                : [];
+
+        const noOrgStep =
+            mapping.program?.createEntities ||
+            mapping.program?.createEnrollments ||
+            mapping.program?.createEvents
+                ? []
+                : [7];
         const activeSteps = steps.filter(({ id }) => {
             if (mapping.dataSource !== "dhis2-program" && mapping.isSource) {
                 if (mapping.dataSource === "api") {
                     if (mapping.prefetch) {
                         return (
-                            [1, 2, 3, 7, 9, 10, 11, 13, 15].indexOf(id) !== -1
+                            [1, 2, 3, ...orgStep, 9, 10, 11, 13].indexOf(id) !==
+                            -1
                         );
                     }
-                    return [1, 2, 3, 7, 9, 11, 13, 15].indexOf(id) !== -1;
+                    return (
+                        [1, 2, 3, ...orgStep, 9, 11, 13, 16].indexOf(id) !== -1
+                    );
                 }
                 if (mapping.dataSource === "go-data") {
                     if (mapping.isSource) {
                         return (
-                            [1, 2, 3, 5, 7, 8, 11, 12, 13].indexOf(id) !== -1
+                            [
+                                1,
+                                2,
+                                3,
+                                5,
+                                ...orgStep,
+                                8,
+                                11,
+                                12,
+                                13,
+                                ...hasAttribution,
+                            ].indexOf(id) !== -1
                         );
                     } else {
                         return (
-                            [1, 2, 3, 5, 7, 8, 13, 15, ...preview].indexOf(
-                                id,
-                            ) !== -1
+                            [
+                                1,
+                                2,
+                                3,
+                                5,
+                                ...orgStep,
+                                8,
+                                13,
+                                15,
+                                ...preview,
+                            ].indexOf(id) !== -1
                         );
                     }
                 }
-                if (
-                    mapping.dataSource &&
-                    ["json", "csv-line-list", "xlsx-line-list"].indexOf(
-                        mapping.dataSource,
-                    ) !== -1
-                ) {
+                if (mapping.dataSource && isExcel(mapping)) {
                     return [2, 3, 11, 13, 16, ...preview].indexOf(id) !== -1;
                 }
                 return [1, 2, 3, 11, 13, ...preview].indexOf(id) !== -1;
             }
 
             if (mapping.dataSource === "dhis2-program") {
-                const remove = !mapping.program?.isTracker ? [9, 15] : [];
+                const remove = !mapping.program?.isTracker ? [9, 16] : [16];
 
-                return [5, 8, ...remove, ...noPreview].indexOf(id) === -1;
+                return (
+                    [
+                        5,
+                        ...noOrgStep,
+                        8,
+                        ...remove,
+                        ...noPreview,
+                        ...hasNoAttribution,
+                    ].indexOf(id) === -1
+                );
             }
             if (mapping.dataSource === "go-data") {
                 if (!mapping.program?.isTracker) {
-                    return [6, 8, 9, 11, 15].indexOf(id) === -1;
+                    return (
+                        [
+                            6,
+                            ...noOrgStep,
+                            8,
+                            9,
+                            11,
+                            16,
+                            ...hasNoAttribution,
+                        ].indexOf(id) === -1
+                    );
                 }
-                return [6, 8, 11].indexOf(id) === -1;
+                return (
+                    [6, ...noOrgStep, 8, 11, 16, ...hasNoAttribution].indexOf(
+                        id,
+                    ) === -1
+                );
             }
-            const include = !mapping.program?.isTracker ? [] : [9, 15];
-
-            return [1, 2, 3, 7, 10, 11, 12, 13, ...include].indexOf(id) !== -1;
+            const include = !mapping.program?.isTracker ? [] : [9];
+            return (
+                [
+                    1,
+                    2,
+                    3,
+                    ...orgStep,
+                    ,
+                    10,
+                    11,
+                    12,
+                    13,
+                    ...include,
+                    ...hasAttribution,
+                ].indexOf(id) !== -1
+            );
         });
         activeStepsApi.set(activeSteps);
         return activeSteps;

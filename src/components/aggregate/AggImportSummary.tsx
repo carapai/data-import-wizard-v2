@@ -225,20 +225,20 @@ export default function AggImportSummary({ db }: { db: CQIDexie }) {
         } else {
             const organisationUnitMapping =
                 metadata.destinationOrgUnits.reduce<Mapping>((a, b) => {
-                    if (b.source && b.value) a[b.value] = b;
+                    if (b.source && b.value) a.set(b.value, b);
                     return a;
-                }, {});
+                }, new Map());
             const attributionMapping =
                 metadata.destinationCategories.reduce<Mapping>((a, b) => {
-                    if (b.source && b.value) a[b.value] = b;
+                    if (b.source && b.value) a.set(b.value, b);
                     return a;
-                }, {});
+                }, new Map());
             const dataMapping = metadata.destinationCategories.reduce<Mapping>(
                 (a, b) => {
-                    if (b.source && b.value) a[b.value] = b;
+                    if (b.source && b.value) a.set(b.value, b);
                     return a;
                 },
-                {},
+                new Map(),
             );
             await processAggregateData({
                 mapping,

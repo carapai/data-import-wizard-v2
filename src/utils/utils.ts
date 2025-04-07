@@ -1,41 +1,43 @@
 import { ColumnsType } from "antd/es/table";
-import { saveAs } from "file-saver";
-
 import {
     AggDataValue,
     Authentication,
+    CategoryCombo,
+    CellStyle,
     convertToAggregate,
+    ExcelHeader,
+    ExportColumn,
     Extraction,
     flipMapping,
     generateUid,
-    IDataSet,
     IMapping,
-    IProgram,
     Mapping,
     Option,
+    RealMapping,
     StageMapping,
+    updateNested,
 } from "data-import-wizard-utils";
 import dayjs from "dayjs";
 import { IndexableType, Table } from "dexie";
-import ExcelJS from "exceljs";
+import { Style as ExcelStyle } from "exceljs";
+
 import {
     chunk,
     fromPairs,
     groupBy,
-    intersection,
+    isEmpty,
     orderBy,
     range,
-    some,
     times,
     uniq,
 } from "lodash";
 import { uniqBy } from "lodash/fp";
-import { Key } from "react";
 import { utils, WorkBook } from "xlsx";
+import { mediumWidth, smallestWidth } from "../constants";
 import { CQIDexie } from "../db";
+import { ExcelGenerator } from "../ExcelGenerator";
 import { Column, Threshold } from "../Interfaces";
 import { getDHIS2Resource } from "../Queries";
-import { mediumWidth, smallestWidth } from "../constants";
 
 interface SearchMappingParams {
     value: string;
@@ -494,7 +496,7 @@ export const saveMapping = async ({
         attributeMapping: Mapping;
         enrollmentMapping: Mapping;
         attributionMapping: Mapping;
-        optionMapping: Record<string, string>;
+        optionMapping: Map<string, string>;
         programStageMapping: StageMapping;
     }>;
     action: "creating" | "editing";
@@ -530,7 +532,7 @@ export const saveMapping = async ({
         ]);
     }
 
-    if (attributionMapping) {
+    if (!isEmpty(attributionMapping)) {
         mutations = mutations.concat([
             engine.mutate({
                 type,
@@ -615,7 +617,7 @@ export const findMapped = (destinationOptions: Array<Partial<Option>>) => {
 };
 export const isMapped = (value: any, mapping: Mapping) => {
     if (value === undefined) return false;
-    return mapping[value] && mapping[value].source;
+    return mapping.get(value) && mapping.get(value)?.source;
 };
 
 export const processAggregateData = async ({
@@ -848,8 +850,8 @@ export const invalidDataColumns = (
     return [];
 };
 
-export const hasAttribution = (dataSet: Partial<IDataSet>) => {
-    const categories = dataSet.categoryCombo?.categories.filter(
+export const hasAttribution = (categoryCombo: CategoryCombo | undefined) => {
+    const categories = categoryCombo?.categories.filter(
         ({ name }) => name !== "default",
     );
     return categories && categories.length > 0;
@@ -885,26 +887,40 @@ export const searchMapping = ({
     path,
     isOrgUnitMapping,
 }: SearchMappingParams): Partial<Option> | undefined => {
-    return sourceOptions.find((option) => {
-        const {
-            code: code1 = "",
-            value: value1 = "",
-            label: label1 = "",
-            id: id1 = "",
-            path: path1 = "",
-        } = option;
-        if (mapping.orgUnitMapping?.matchHierarchy && isOrgUnitMapping) {
+    if (mapping.orgUnitMapping?.matchHierarchy && isOrgUnitMapping) {
+        let search = sourceOptions.find((option) => {
+            const { path: path1 = "" } = option;
             const sourcePath = cleanString(path1).toLowerCase();
             const destPath = cleanString(path).toLowerCase();
-            return destPath.includes(sourcePath);
+            return destPath.endsWith(sourcePath);
+        });
+        if (search === undefined) {
+            search = sourceOptions.find((option) => {
+                const { path: path1 = "" } = option;
+                const sourcePath = cleanString(path1).toLowerCase();
+                const destPath = cleanString(path).toLowerCase();
+                return destPath.includes(sourcePath);
+            });
         }
-        if (value1 && value && value === value1) return true;
-        if (code && code1 && code === code1) return true;
-        if (id && id1 && id === id1) return true;
-        return cleanString(label)
-            .toLowerCase()
-            .includes(cleanString(label1).toLowerCase());
-    });
+        return search;
+    } else {
+        return sourceOptions.find((option) => {
+            const {
+                code: code1 = "",
+                value: value1 = "",
+                label: label1 = "",
+                id: id1 = "",
+            } = option;
+
+            if (value1 && value && value === value1) return true;
+            if (code && code1 && code === code1) return true;
+            if (id && id1 && id === id1) return true;
+            return (
+                cleanString(label).toLowerCase() ===
+                cleanString(label1).toLowerCase()
+            );
+        });
+    }
 };
 
 export const updateMapping = async ({
@@ -951,54 +967,53 @@ export const readMappings = async (db: CQIDexie) => {
         const attribution = await db.attributionMapping.toArray();
         const options = await db.optionsMapping.toArray();
 
-        const attributionMapping =
-            attribution?.reduce<Mapping>((a, b) => {
-                if (b.value) {
-                    a[b.value] = b;
-                }
-                return a;
-            }, {}) ?? {};
-        const optionsMapping =
-            options?.reduce<Mapping>((a, b) => {
-                if (b.value) {
-                    a[b.value] = b;
-                }
-                return a;
-            }, {}) ?? {};
+        const attributionMapping = attribution?.reduce<Mapping>((a, b) => {
+            if (b.value) {
+                a.set(b.value, b);
+            }
+            return a;
+        }, new Map<string, Partial<RealMapping>>());
+        const optionsMapping = options?.reduce<Mapping>((a, b) => {
+            if (b.value) {
+                a.set(b.value, b);
+            }
+            return a;
+        }, new Map<string, Partial<RealMapping>>());
 
-        const organisationUnitMapping =
-            unitsMapping?.reduce<Mapping>((a, b) => {
+        const organisationUnitMapping = unitsMapping?.reduce<Mapping>(
+            (a, b) => {
                 if (b.value) {
-                    a[b.value] = b;
+                    a.set(b.value, b);
                 }
                 return a;
-            }, {}) ?? {};
+            },
+            new Map<string, Partial<RealMapping>>(),
+        );
 
-        const attributeMapping =
-            aMapping?.reduce<Mapping>((a, b) => {
-                if (b.value) {
-                    a[b.value] = b;
-                }
+        const attributeMapping = aMapping?.reduce<Mapping>((a, b) => {
+            if (b.value) {
+                a.set(b.value, b);
+            }
+            return a;
+        }, new Map<string, Partial<RealMapping>>());
+        const enrollmentMapping = enrollment?.reduce<Mapping>((a, b) => {
+            if (b.value) {
+                a.set(b.value, b);
+            }
+            return a;
+        }, new Map<string, Partial<RealMapping>>());
+        const programStageMapping = stageMapping?.reduce<StageMapping>(
+            (a, b) => {
+                a = updateNested(
+                    a,
+                    b.stage ?? "",
+                    b.value ?? "",
+                    () => b as Partial<RealMapping>,
+                );
                 return a;
-            }, {}) ?? {};
-        const enrollmentMapping =
-            enrollment?.reduce<Mapping>((a, b) => {
-                if (b.value) {
-                    a[b.value] = b;
-                }
-                return a;
-            }, {}) ?? {};
-        const programStageMapping =
-            stageMapping?.reduce<StageMapping>((a, b) => {
-                if (b.stage && b.value && a[b.stage]) {
-                    a[b.stage][b.value] = b;
-                } else if (b.stage && b.value) {
-                    a[b.stage] = {
-                        [b.value]: b,
-                    };
-                }
-                return a;
-            }, {}) ?? {};
+            },
+            new Map<string, Mapping>(),
+        );
 
         return {
             attributeMapping,
@@ -1021,132 +1036,48 @@ export const readMappings = async (db: CQIDexie) => {
 };
 
 export const generateExcelData = async (
-    program: Partial<IProgram>,
-    columns: Key[],
+    columns: ExportColumn[],
     stagesMax: Record<string, number>,
     processedData: any[],
-    levels: Option[],
 ) => {
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet("Sheet 1");
-    let createdColumns: any[] = [];
-    program.programTrackedEntityAttributes?.forEach(
-        ({ trackedEntityAttribute: { id, name, displayFormName } }) => {
-            if (columns.includes(id)) {
-                createdColumns.push({
-                    header: displayFormName || name,
-                    key: id,
-                });
-            }
-        },
-    );
-    levels.forEach((level) => {
-        if (level.value && level.label && columns.includes(level.value)) {
-            createdColumns.push({
-                header: level.label,
-                key: level.value,
-            });
-        }
-    });
-    program.programStages?.forEach(
-        ({
-            id: stageId,
-            name: stageName,
-            programStageDataElements,
-            repeatable,
-        }) => {
-            const available = intersection(
-                programStageDataElements.map(
-                    (a) => `${stageId}-${a.dataElement.id}`,
-                ),
-                columns,
-            );
-            if (available.length > 0) {
-                if (repeatable) {
-                    range(stagesMax[stageId]).forEach((i) => {
-                        [
-                            {
-                                allowFutureDate: false,
-                                compulsory: true,
-                                dataElement: {
-                                    code: "eventDate",
-                                    id: "eventDate",
-                                    name: "Event Date",
-                                    displayName: "eventDate",
-                                    optionSetValue: false,
-                                    zeroIsSignificant: false,
-                                    valueType: "",
-                                    optionSet: {
-                                        id: "",
-                                        name: "",
-                                        options: [
-                                            {
-                                                code: "",
-                                                id: "",
-                                                name: "",
-                                            },
-                                        ],
-                                    },
-                                },
-                            },
-                            ...programStageDataElements,
-                        ].forEach(({ dataElement: { id, name } }) => {
-                            if (columns.includes(`${stageId}-${id}`)) {
-                                createdColumns.push({
-                                    header: `${stageName}.${i}.${name}`,
-                                    key: `0-${stageId}-${id}-${i}`,
-                                });
-                            }
-                        });
-                    });
-                } else {
-                    [
-                        {
-                            allowFutureDate: false,
-                            compulsory: true,
-                            dataElement: {
-                                code: "eventDate",
-                                id: "eventDate",
-                                name: "Event Date",
-                                displayName: "eventDate",
-                                optionSetValue: false,
-                                zeroIsSignificant: false,
-                                valueType: "",
-                                optionSet: {
-                                    id: "",
-                                    name: "",
-                                    options: [
-                                        {
-                                            code: "",
-                                            id: "",
-                                            name: "",
-                                        },
-                                    ],
-                                },
-                            },
-                        },
-                        ...programStageDataElements,
-                    ].forEach(({ dataElement: { id, name } }) => {
-                        if (columns.includes(`${stageId}-${id}`)) {
-                            createdColumns.push({
-                                header: `${stageName}.0.${name}`,
-                                key: `0-${stageId}-${id}-0`,
-                            });
-                        }
-                    });
-                }
-            }
-        },
-    );
+    const headers: ExcelHeader[] = columns.map((parent) => {
+        let children: ExcelHeader[] = [];
+        const totalEvents = stagesMax[parent.column] ?? 1;
 
-    worksheet.columns = createdColumns;
-    processedData.forEach((row) => worksheet.addRow(row));
-    const buffer = await workbook.xlsx.writeBuffer();
-    // Save the file
-    const blob = new Blob([buffer], {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        if (parent.children.length > 0) {
+            if (parent.repeatable) {
+                children = range(totalEvents).flatMap((d) => {
+                    return parent.children.map((child) => ({
+                        title: `#${d + 1} ${child.label}`,
+                        key: `0-${parent.column}-${child.column}-${d}`,
+                    }));
+                });
+            } else {
+                children = parent.children.map((child) => ({
+                    title: child.label,
+                    key: `0-${parent.column}-${child.column}-0`,
+                }));
+            }
+        }
+        return {
+            title: parent.label,
+            key: parent.column,
+            children,
+        };
     });
-    saveAs(blob, `export.xlsx`);
+    const generator = new ExcelGenerator();
+    try {
+        await generator.downloadExcel(
+            headers,
+            processedData,
+            `${new Date().toISOString()}-report.xlsx`,
+            {
+                sheetName: "Export",
+            },
+        );
+    } catch (error) {
+        console.error("Error generating Excel file:", error);
+    }
 };
 
 export const enrollmentOptions: Option[] = [
@@ -1155,6 +1086,46 @@ export const enrollmentOptions: Option[] = [
 ];
 
 export const calculateWidth = (width: number) => {
-	const allSmall = smallestWidth * 5;
-    return width - allSmall - mediumWidth - 170;
+    const allSmall = smallestWidth * 5;
+    return width - allSmall - mediumWidth - 200;
 };
+
+export function convertToExcelStyle(
+    customStyle?: CellStyle,
+): Partial<ExcelStyle> | undefined {
+    if (!customStyle) return undefined;
+
+    return {
+        font: customStyle.font,
+        fill: customStyle.fill,
+        border: customStyle.border,
+        alignment: customStyle.alignment,
+        numFmt: customStyle.numFmt,
+    };
+}
+
+export const DEFAULT_HEADER_STYLE: CellStyle = {
+    font: {
+        bold: true,
+        color: { argb: "000000" },
+    },
+    alignment: {
+        vertical: "middle",
+        horizontal: "center",
+    },
+    border: {
+        top: { style: "thin", color: { argb: "000000" } },
+        left: { style: "thin", color: { argb: "000000" } },
+        bottom: { style: "thin", color: { argb: "000000" } },
+        right: { style: "thin", color: { argb: "000000" } },
+    },
+};
+
+export const isFileBasedMapping = (mapping: Partial<IMapping>) =>
+    new Set<string>([
+        "csv-line-list",
+        "xlsx-line-list",
+        "xlsx-tabular-data",
+        "xlsx-form",
+        "json",
+    ]).has(mapping?.dataSource ?? "");

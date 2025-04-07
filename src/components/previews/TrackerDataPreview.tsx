@@ -43,9 +43,9 @@ export default function TrackerDataPreview() {
             title: "Value",
             key: "value",
             render: (_, record) => {
-                let value = getOr("", "value", record);
-                if (isArray(value)) return JSON.stringify(value);
-                if (isObject(value)) return JSON.stringify(value);
+                const value = getOr("", "value", record);
+                if (isArray(value) || isObject(value))
+                    return JSON.stringify(value);
                 return value;
             },
         },
@@ -165,6 +165,11 @@ export default function TrackerDataPreview() {
                 key: "enrollment",
                 title: "Enrollment",
             },
+            {
+                dataIndex: "attributeOptionCombo",
+                key: "attributeOptionCombo",
+                title: "Attribution",
+            },
         ],
         [],
     );
@@ -178,17 +183,19 @@ export default function TrackerDataPreview() {
             })),
         [Object.keys(processed.dhis2.conflicts?.[0] ?? {})],
     );
-    const errorColumns = useMemo<ColumnsType<any>>(
-        () =>
-            Object.keys(processed.dhis2.errors?.[0] ?? {})
-                .filter((i) => i !== "id")
-                .map((a) => ({
-                    title: a,
-                    render: (_, record) => allNames[record[a]] || record[a],
-                    key: a,
-                })),
-        [Object.keys(processed.dhis2.errors?.[0] ?? {})],
-    );
+    const errorColumns = useMemo<ColumnsType<any>>(() => {
+        const currentColumns = new Set<string>();
+        processed.dhis2.errors.forEach((error) => {
+            Object.keys(error).forEach((a) => currentColumns.add(a));
+        });
+        return Array.from(currentColumns)
+            .filter((i) => i !== "id")
+            .map((a) => ({
+                title: a,
+                render: (_, record) => allNames[record[a]] || record[a],
+                key: a,
+            }));
+    }, [Object.keys(processed.dhis2.errors?.[0] ?? {})]);
 
     return (
         <Tabs>

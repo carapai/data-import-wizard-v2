@@ -71,12 +71,9 @@ export default function OptionSetMapping({
                             options={currentSourceOptions}
                             style={{ width: "100%" }}
                             mode="multiple"
-                            value={getOr(
-                                "",
-                                value || code || label || "",
-                                optionMapping,
-                            )
-                                .split(",")
+                            value={optionMapping
+                                .get(value || code || label || "")
+                                ?.split(",")
                                 .filter((a) => !!a)}
                             showSearch
                             allowClear
@@ -99,7 +96,7 @@ export default function OptionSetMapping({
                 } else {
                     return (
                         <Input
-                            value={optionMapping[code || ""]}
+                            value={optionMapping.get(code || "")}
                             onChange={(e: ChangeEvent<HTMLInputElement>) =>
                                 optionMappingApi.add({
                                     key: code || "",
@@ -144,7 +141,7 @@ export default function OptionSetMapping({
         } else if (mapping.dataSource === "go-data") {
             currentSourceOptionsApi.set(
                 goDataOptions.map(({ id }) => {
-                    return { label: allTokens[id] || id, value: id };
+                    return { label: allTokens.get(id) || id, value: id };
                 }),
             );
         } else if (mapping.dataSource === "dhis2-program") {

@@ -1,4 +1,3 @@
-import { Stack } from "@chakra-ui/react";
 import { useStore } from "effector-react";
 
 import { CQIDexie } from "../../db";

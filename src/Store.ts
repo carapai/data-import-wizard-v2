@@ -6,7 +6,6 @@ import {
     getMandatoryAttributes,
     getProgramStageUniqColumns,
     getProgramStageUniqElements,
-    getProgramUniqAttributes,
     GODataOption,
     IDataSet,
     IGoData,
@@ -57,6 +56,12 @@ export const actionApi = createApi($action, {
 
 export const $workbook = domain.createStore<WorkBook | null>(null);
 
+export const $fhir = domain.createStore<{
+    concepts: any[];
+    labelColumn: string;
+    valueColumn: string;
+}>({ concepts: [], labelColumn: "", valueColumn: "" });
+
 export const workbookApi = createApi($workbook, {
     set: (_, workbook: WorkBook) => workbook,
     reset: () => null,
@@ -88,7 +93,7 @@ export const $dataSet = domain.createStore<Partial<IDataSet>>({});
 export const $dhis2DataSet = domain.createStore<Partial<IDataSet>>({});
 export const $programIndicators = domain.createStore<Option[]>([]);
 export const $indicators = domain.createStore<Option[]>([]);
-export const $attributionMapping = domain.createStore<Mapping>({});
+export const $attributionMapping = domain.createStore<Mapping>(new Map());
 
 export const $otherName = $mapping.map((state) => {
     if (state.isSource) return "Destination";
@@ -147,12 +152,12 @@ export const $configList = $mapping.map((state) => {
     return [];
 });
 
-export const $attributeMapping = domain.createStore<Mapping>({});
-export const $enrollmentMapping = domain.createStore<Mapping>({});
-export const $remoteMapping = domain.createStore<Mapping>({});
+export const $attributeMapping = domain.createStore<Mapping>(new Map());
+export const $enrollmentMapping = domain.createStore<Mapping>(new Map());
+export const $remoteMapping = domain.createStore<Mapping>(new Map());
 export const $remoteOrganisations = domain.createStore<any[]>([]);
-export const $programStageMapping = domain.createStore<StageMapping>({});
-export const $organisationUnitMapping = domain.createStore<Mapping>({});
+export const $programStageMapping = domain.createStore<StageMapping>(new Map());
+export const $organisationUnitMapping = domain.createStore<Mapping>(new Map());
 
 export const $columns = $data.map((state) => findColumns(state));
 
@@ -205,22 +210,23 @@ export const $processed = domain.createStore<Processed>({
     },
     processedData: [],
 });
-export const $prevGoData = domain.createStore<Dictionary<string>>({});
+export const $prevGoData = domain.createStore<Map<string, string>>(new Map());
 
 export const $programStageUniqueElements = combine(
     { programStageMapping: $programStageMapping, mapping: $mapping },
-    ({ programStageMapping, mapping }) =>
-        getProgramStageUniqElements(
-            mapping.eventStageMapping ?? {},
+    ({ programStageMapping, mapping }) => {
+        return getProgramStageUniqElements(
+            mapping.eventStageMapping ?? new Map(),
             programStageMapping,
-        ),
+        );
+    },
 );
 
 export const $programStageUniqueColumns = combine(
     { programStageMapping: $programStageMapping, mapping: $mapping },
     ({ programStageMapping, mapping }) =>
         getProgramStageUniqColumns(
-            mapping.eventStageMapping ?? {},
+            mapping.eventStageMapping ?? new Map(),
             programStageMapping,
         ),
 );
@@ -247,13 +253,15 @@ export const $dhis2Program = domain.createStore<Partial<IProgram>>({});
 export const $programTypes = $program.map((state) => makeProgramTypes(state));
 export const $goData = domain.createStore<Partial<IGoData>>({});
 
-export const $tokens = domain.createStore<Dictionary<string>>({});
+export const $tokens = domain.createStore<Map<string, string>>(new Map());
 export const $activeSteps = domain.createStore<Step[]>([]);
 export const $token = domain.createStore<string>("");
 
 export const $currentOptions = domain.createStore<Option[]>([]);
 
-export const $optionMapping = domain.createStore<Record<string, string>>({});
+export const $optionMapping = domain.createStore<Map<string, string>>(
+    new Map(),
+);
 export const $currentSourceOptions = domain.createStore<Option[]>([]);
 
 export const $errors = domain.createStore<any[]>([]);
@@ -278,6 +286,7 @@ export const $metadata = combine(
         enrollmentMapping: $enrollmentMapping,
         programStageMapping: $programStageMapping,
         organisationUnitMapping: $organisationUnitMapping,
+        fhir: $fhir,
     },
     ({
         mapping,
@@ -292,7 +301,7 @@ export const $metadata = combine(
         dhis2DataSet,
         programIndicators,
         indicators,
-
+        fhir,
         enrollmentMapping,
         programStageMapping,
         attributeMapping,
@@ -317,6 +326,7 @@ export const $metadata = combine(
                 attributeMapping,
                 organisationUnitMapping,
             },
+            fhir,
         });
     },
 );
@@ -497,4 +507,11 @@ export const $additionalParams = $mapping.map((mapping) => {
         };
     }
     return additionalParams;
+});
+
+export const $conceptColumns = $fhir.map((fhir) => {
+    if (fhir.concepts.length > 0) {
+        return Object.keys(fhir.concepts[0]);
+    }
+    return [];
 });

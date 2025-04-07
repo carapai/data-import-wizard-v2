@@ -12,12 +12,12 @@ import {
     insertTrackerData,
     insertTrackerData38,
     Processed,
-    Option,
 } from "data-import-wizard-utils";
 import { useStore } from "effector-react";
 import { useEffect, useState } from "react";
 import {
     $attributeMapping,
+    $attributionMapping,
     $data,
     $enrollmentMapping,
     $goData,
@@ -39,7 +39,7 @@ import Progress from "../Progress";
 import { useLiveQuery } from "dexie-react-hooks";
 import { maxBy } from "lodash";
 import { CQIDexie } from "../../db";
-import { enrollmentOptions, generateExcelData } from "../../utils/utils";
+import { generateExcelData, isFileBasedMapping } from "../../utils/utils";
 
 type TrackerAddition = {
     id: string;
@@ -66,16 +66,13 @@ export default function ProgramImportSummary({ db }: { db: CQIDexie }) {
     const [count, setCount] = useState(0);
     const mapping = useStore($mapping);
     const optionMapping = useStore($optionMapping);
+    const attributionMapping = useStore($attributionMapping);
     const tokens = useStore($tokens);
     const prevGoData = useStore($prevGoData);
     const goData = useStore($goData);
     const processed = useStore($processed);
     const remoteAPI = useStore($remoteAPI);
     const referenceData = useStore($goDataOptions);
-    const [inserted, setInserted] = useState<any[]>([]);
-    const [errored, setErrored] = useState<any[]>([]);
-    const [updates, setUpdates] = useState<any[]>([]);
-
     const [excelData, setExcelData] = useState<any[]>([]);
     const metadata = useStore($metadata);
     const data = useStore($data);
@@ -94,76 +91,83 @@ export default function ProgramImportSummary({ db }: { db: CQIDexie }) {
         const notProcessed = await db.trackerResponses
             .where({ completed: "false" })
             .toArray();
-        for (const { id } of notProcessed ?? []) {
-            const { data }: any = await engine.query({
-                data: {
-                    resource: `system/taskSummaries/TRACKER_IMPORT_JOB/${id}`,
-                },
-            });
-            if (data && data.status && ["OK"].indexOf(data.status) !== -1) {
-                await db.trackerResponses.put({
-                    id,
-                    completed: "true",
-                    children: [
-                        {
-                            ...data.bundleReport.typeReportMap["TRACKED_ENTITY"]
-                                .stats,
-                            completed: "true",
-                            resource: "entities",
-                            id: id + "entities",
-                        },
-                        {
-                            ...data.bundleReport.typeReportMap["ENROLLMENT"]
-                                .stats,
-                            completed: "true",
-                            resource: "enrollments",
-                            id: id + "enrollments",
-                        },
-                        {
-                            ...data.bundleReport.typeReportMap["EVENT"].stats,
-                            completed: "true",
-                            resource: "events",
-                            id: id + "events",
-                        },
-                        {
-                            ...data.bundleReport.typeReportMap["RELATIONSHIP"]
-                                .stats,
-                            completed: "true",
-                            resource: "relationships",
-                            id: id + "relationships",
-                        },
-                    ],
-                    resource: "multiple",
-                    ...data.stats,
+        if (notProcessed.length === 0) {
+            onClose();
+        } else {
+            for (const { id } of notProcessed) {
+                const { data }: any = await engine.query({
+                    data: {
+                        resource: `system/taskSummaries/TRACKER_IMPORT_JOB/${id}`,
+                    },
                 });
-            } else if (data && data.status && data.status === "ERROR") {
-                await db.trackerResponses.put({
-                    id,
-                    completed: "true",
-                    children: [],
-                    resource: "multiple",
-                    ...data.stats,
-                });
-                if (data && data.conflicts && data.conflicts.length > 0) {
-                    await db.dataValueConflicts.bulkPut(data.conflicts);
-                }
-                if (
-                    data &&
-                    data.validationReport &&
-                    data.validationReport.errorReports
-                ) {
-                    db.dataValueErrors.bulkPut(
-                        data.validationReport.errorReports,
-                    );
-                }
-                if (
-                    data &&
-                    data.validationReport &&
-                    data.validationReport.warningReports
-                ) {
-                    db.dataValueConflicts.bulkPut(
-                        data.validationReport.warningReports,
-                    );
+                if (data && data.status && ["OK"].indexOf(data.status) !== -1) {
+                    await db.trackerResponses.put({
+                        id,
+                        completed: "true",
+                        children: [
+                            {
+                                ...data.bundleReport.typeReportMap[
+                                    "TRACKED_ENTITY"
+                                ].stats,
+                                completed: "true",
+                                resource: "entities",
+                                id: id + "entities",
+                            },
+                            {
+                                ...data.bundleReport.typeReportMap["ENROLLMENT"]
+                                    .stats,
+                                completed: "true",
+                                resource: "enrollments",
+                                id: id + "enrollments",
+                            },
+                            {
+                                ...data.bundleReport.typeReportMap["EVENT"]
+                                    .stats,
+                                completed: "true",
+                                resource: "events",
+                                id: id + "events",
+                            },
+                            {
+                                ...data.bundleReport.typeReportMap[
+                                    "RELATIONSHIP"
+                                ].stats,
+                                completed: "true",
+                                resource: "relationships",
+                                id: id + "relationships",
+                            },
+                        ],
+                        resource: "multiple",
+                        ...data.stats,
+                    });
+                } else if (data && data.status && data.status === "ERROR") {
+                    await db.trackerResponses.put({
+                        id,
+                        completed: "true",
+                        children: [],
+                        resource: "multiple",
+                        ...data.stats,
+                    });
+                    if (data && data.conflicts && data.conflicts.length > 0) {
+                        await db.dataValueConflicts.bulkPut(data.conflicts);
+                    }
+                    if (
+                        data &&
+                        data.validationReport &&
+                        data.validationReport.errorReports
+                    ) {
+                        db.dataValueErrors.bulkPut(
+                            data.validationReport.errorReports,
+                        );
+                    }
+                    if (
+                        data &&
+                        data.validationReport &&
+                        data.validationReport.warningReports
+                    ) {
+                        db.dataValueConflicts.bulkPut(
+                            data.validationReport.warningReports,
+                        );
+                    }
                 }
             }
         }
@@ -289,7 +293,6 @@ export default function ProgramImportSummary({ db }: { db: CQIDexie }) {
                                     }
                                 </Text>
                             )}
-
                             <Text>of</Text>
                             {responses && <Text>{responses.length}</Text>}
                         </Stack>
@@ -311,6 +314,7 @@ export default function ProgramImportSummary({ db }: { db: CQIDexie }) {
                     rowKey={(r) =>
                         `${r.uid}${r.errorCode}${r.object}${r.value}${r.property}`
                     }
+                    scroll={{ x: 400 }}
                 />
             ),
         },
@@ -348,21 +352,21 @@ export default function ProgramImportSummary({ db }: { db: CQIDexie }) {
                     mapping.authentication || {},
                     async (message) => {
                         await db.messages.put({
-                            message: "Loading previous mapping",
+                            message,
                             id: 1,
                         });
                     },
-                    setInserted,
-                    setUpdates,
-                    setErrored,
+                    ({ errors, inserts, updates }) => {
+                        console.log(errors, inserts, updates);
+                    },
                 );
+                onClose();
             } else if (
                 mapping.dataSource &&
                 ["csv-line-list", "xlsx-line-list"].indexOf(
                     mapping.dataSource,
                 ) !== -1
             ) {
-                const levels = await db.levels.toArray();
                 const allStages =
                     program.programStages?.reduce<Record<string, number>>(
                         (a, b) => {
@@ -376,35 +380,17 @@ export default function ProgramImportSummary({ db }: { db: CQIDexie }) {
                         {},
                     ) ?? {};
                 await generateExcelData(
-                    program,
                     realColumns,
                     allStages,
                     processedData.processedData,
-                    enrollmentOptions
-                        .map<Option>(({ label, value }) => ({
-                            label,
-                            value: `0-${value}`,
-                        }))
-                        .concat(
-                            levels.flatMap<Option>(({ value, label }) => [
-                                {
-                                    value: `level${value}id`,
-                                    label: `${label} id`,
-                                },
-                                {
-                                    value: `level${value}name`,
-                                    label: `${label} name`,
-                                },
-                            ]),
-                        ),
                 );
+                onClose();
             }
         } else {
             if (version >= 38) {
                 await insertTrackerData38({
                     processedData,
-                    async: mapping.dhis2DestinationOptions?.async ?? false,
-                    chunkSize: mapping.chunkSize ?? 100,
+                    mapping,
                     api,
                     onInsert: async (response) => {
                         if (mapping.dhis2DestinationOptions?.async) {
@@ -501,7 +487,7 @@ export default function ProgramImportSummary({ db }: { db: CQIDexie }) {
         await db.dataValueErrors.clear();
         await db.messages.clear();
         onOpen();
-        if (mapping.prefetch) {
+        if (mapping.prefetch || isFileBasedMapping(mapping)) {
             await insertData(insertApi, processed, mapping);
         } else {
             await convert({
@@ -530,7 +516,12 @@ export default function ProgramImportSummary({ db }: { db: CQIDexie }) {
                 enrollmentMapping,
                 version,
                 additionalParams: {},
-                setMessage: () => {},
+                setMessage: async (message) => {
+                    await db.messages.put({
+                        message,
+                        id: 1,
+                    });
+                },
                 organisationUnitMapping,
                 goData,
                 data,
@@ -538,6 +529,7 @@ export default function ProgramImportSummary({ db }: { db: CQIDexie }) {
                 program,
                 metadata,
                 referenceData,
+                attributionMapping,
             });
 
             if (
@@ -550,7 +542,6 @@ export default function ProgramImportSummary({ db }: { db: CQIDexie }) {
                 setExcelData(excelData);
             }
         }
-        onClose();
     };
     useEffect(() => {
         fetchAndInsert();
@@ -559,7 +550,6 @@ export default function ProgramImportSummary({ db }: { db: CQIDexie }) {
         const intervalId = setInterval(() => {
             processRecords();
         }, 2000);
-
         return () => clearInterval(intervalId);
     }, [count]);
     return (

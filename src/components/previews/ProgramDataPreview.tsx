@@ -1,28 +1,29 @@
 import { Button, Stack, Text, useDisclosure } from "@chakra-ui/react";
 import { useDataEngine } from "@dhis2/app-runtime";
 import { AxiosInstance } from "axios";
-import { convert, Option } from "data-import-wizard-utils";
+import { convert, isExcel, Option } from "data-import-wizard-utils";
 import { useStore } from "effector-react";
-import { saveAs } from "file-saver";
+import saveAs from "file-saver";
 import { useEffect } from "react";
 import { CQIDexie } from "../../db";
 import { processor } from "../../Events";
 import { useOneLiveQuery } from "../../hooks/useOneLiveQuery";
 import {
-	$attributeMapping,
-	$data,
-	$enrollmentMapping,
-	$goData,
-	$goDataOptions,
-	$mapping,
-	$metadata,
-	$optionMapping,
-	$organisationUnitMapping,
-	$processed,
-	$program,
-	$programStageMapping,
-	$remoteAPI,
-	$tokens
+    $attributeMapping,
+    $attributionMapping,
+    $data,
+    $enrollmentMapping,
+    $goData,
+    $goDataOptions,
+    $mapping,
+    $metadata,
+    $optionMapping,
+    $organisationUnitMapping,
+    $processed,
+    $program,
+    $programStageMapping,
+    $remoteAPI,
+    $tokens,
 } from "../../Store";
 
 import { $version } from "../../Store";
@@ -45,6 +46,7 @@ export default function ProgramDataPreview({ db }: { db: CQIDexie }) {
     const organisationUnitMapping = useStore($organisationUnitMapping);
     const enrollmentMapping = useStore($enrollmentMapping);
     const attributeMapping = useStore($attributeMapping);
+    const attributionMapping = useStore($attributionMapping);
     const programStageMapping = useStore($programStageMapping);
     const goData = useStore($goData);
     const data = useStore($data);
@@ -78,23 +80,25 @@ export default function ProgramDataPreview({ db }: { db: CQIDexie }) {
 
         let excelData: any[] = [];
         await convert({
-            afterConversion: (converted) => {
+            afterConversion: (converted, pager) => {
                 processor.addGoData(converted);
                 processor.addDHIS2Data(converted);
-
                 if (
                     mapping.isSource &&
                     mapping.dataSource &&
-                    ["csv-line-list", "xlsx-line-list"].indexOf(
-                        mapping.dataSource,
-                    ) !== -1
+                    isExcel(mapping)
                 ) {
                     excelData = excelData.concat(converted.processedData);
                 } else {
                     processor.addProcessedData(converted);
                 }
 
-                onClose();
+                if (
+                    (pager && pager.page === pager.pageCount) ||
+                    pager === undefined
+                ) {
+                    onClose();
+                }
             },
             attributeMapping,
             programStageMapping,
@@ -105,8 +109,8 @@ export default function ProgramDataPreview({ db }: { db: CQIDexie }) {
             enrollmentMapping,
             version,
             additionalParams: {},
-            setMessage: (message) => {
-                db.messages.put({
+            setMessage: async (message) => {
+                await db.messages.put({
                     message,
                     id: 1,
                 });
@@ -118,6 +122,7 @@ export default function ProgramDataPreview({ db }: { db: CQIDexie }) {
             program,
             metadata,
             referenceData,
+            attributionMapping,
         });
         if (
             mapping.isSource &&
@@ -145,7 +150,6 @@ export default function ProgramDataPreview({ db }: { db: CQIDexie }) {
                     type: "application/json",
                 },
             );
-
             const trackedEntityInstances = new Blob(
                 [JSON.stringify(processed.dhis2.trackedEntityInstances)],
                 {
@@ -173,10 +177,10 @@ export default function ProgramDataPreview({ db }: { db: CQIDexie }) {
                 <Case value={true}>
                     <SwitchComponent condition={mapping.dataSource}>
                         <Case value="csv-line-list">
-                            <ExcelExportPreview db={db} levels={levels} />
+                            <ExcelExportPreview />
                         </Case>
                         <Case value="xlsx-line-list">
-                            <ExcelExportPreview db={db} levels={levels} />
+                            <ExcelExportPreview />
                         </Case>
                         <Case value="go-data">
                             <GoDataPreview />

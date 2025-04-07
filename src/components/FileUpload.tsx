@@ -1,18 +1,23 @@
 import { Stack } from "@chakra-ui/react";
-import { Extraction, flattenBundle } from "data-import-wizard-utils";
+import { Extraction } from "data-import-wizard-utils";
+import { Event } from "effector";
 import { useStore } from "effector-react";
 import { ChangeEvent, useRef, useState } from "react";
 import { read } from "xlsx";
-import { dataApi, mappingApi } from "../Events";
+import { mappingApi } from "../Events";
 import { $mapping, workbookApi } from "../Store";
 import { getSheetData } from "../utils/utils";
 
 export default function FileUpload({
     type,
     extraction,
+    onDataChange,
+    fileUploadLabel,
 }: {
     type: string;
     extraction: Extraction;
+    onDataChange: Event<any>;
+    fileUploadLabel: string;
 }) {
     const inputRef = useRef<HTMLInputElement>(null);
     const [hasFile, setHasFile] = useState<boolean>(false);
@@ -25,7 +30,7 @@ export default function FileUpload({
             fileReader.onload = async (e) => {
                 const result = e.target?.result;
                 if (result && type === "json") {
-                    dataApi.changeData(JSON.parse(String(result)));
+                    onDataChange(JSON.parse(String(result)));
                 } else {
                     const workbook = read(e.target?.result, {
                         type: "array",
@@ -44,7 +49,7 @@ export default function FileUpload({
                         mapping.dataStartRow,
                         extraction,
                     );
-                    dataApi.changeData(sheetData);
+                    onDataChange(sheetData);
                 }
             };
             type === "json"
@@ -62,6 +67,7 @@ export default function FileUpload({
     if (mapping.isSource) return null;
     return (
         <Stack direction="row" alignItems="center">
+            <label htmlFor="input">{fileUploadLabel}</label>
             <input
                 ref={inputRef}
                 type="file"

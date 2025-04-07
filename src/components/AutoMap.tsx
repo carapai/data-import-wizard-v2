@@ -1,5 +1,5 @@
 import { Checkbox, Stack, useDisclosure } from "@chakra-ui/react";
-import { Mapping, Option } from "data-import-wizard-utils";
+import { Mapping, Option, RealMapping } from "data-import-wizard-utils";
 import { useStore } from "effector-react";
 import { isEmpty } from "lodash";
 import { ChangeEvent, useState } from "react";
@@ -28,7 +28,7 @@ export default function AutoMap({
     const [autoMapping, setAutoMapping] = useState<boolean>(false);
 
     const autoMap = async (map: boolean) => {
-        const processed: Mapping = {};
+        const processed: Mapping = new Map<string, Partial<RealMapping>>();
         onOpen();
         try {
             await db.messages.put({
@@ -48,7 +48,7 @@ export default function AutoMap({
                                 id = "",
                                 path = "",
                             } = option;
-                            const prev = mapped[value];
+                            const prev = mapped.get(value);
                             const search = searchMapping({
                                 value,
                                 label,
@@ -68,24 +68,23 @@ export default function AutoMap({
                                     isOrgUnitMapping &&
                                     mapping.orgUnitMapping?.matchHierarchy
                                 ) {
-                                    processed[value] = {
+                                    processed.set(value, {
                                         ...option,
                                         source: search.path,
-                                    };
+                                    });
                                 } else {
-                                    processed[value] = {
+                                    processed.set(value, {
                                         ...option,
                                         source: search.value,
-                                    };
+                                    });
                                 }
                             } else if (
                                 map &&
                                 (prev === undefined || isEmpty(prev.source)) &&
                                 search === undefined
                             ) {
-                                console.log("No match found");
                             } else if (!map && !isEmpty(prev)) {
-                                processed[value] = { ...prev, source: "" };
+                                processed.delete(value);
                             }
                         }
                         await db.messages.put({

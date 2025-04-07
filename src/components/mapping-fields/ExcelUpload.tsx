@@ -59,7 +59,12 @@ export default function ExcelUpload({
     if (mapping.isSource) return null;
     return (
         <Stack spacing="30px">
-            <FileUpload type="xlsx" extraction={extraction} />
+            <FileUpload
+                type="xlsx"
+                extraction={extraction}
+                onDataChange={dataApi.changeData}
+                fileUploadLabel="Upload Excel file"
+            />
             <Stack direction="row" alignItems="center" flex={1} spacing="20px">
                 <Stack
                     direction="row"

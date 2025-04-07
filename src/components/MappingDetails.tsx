@@ -4,7 +4,7 @@ import { useStore } from "effector-react";
 import { ChangeEvent } from "react";
 import { CQIDexie } from "../db";
 import { mappingApi } from "../Events";
-import { $mapping } from "../Store";
+import { $mapping, $program } from "../Store";
 import { InitialMapping } from "./InitialMapping";
 import { Select } from "antd";
 
@@ -15,6 +15,7 @@ export default function MappingDetails({
     db: CQIDexie;
 }) {
     const mapping = useStore($mapping);
+    const program = useStore($program);
     const onSelect = (e: string | undefined) => {
         mappingApi.update({
             attribute: "dataSource",
@@ -22,6 +23,17 @@ export default function MappingDetails({
         });
         if (e && e === "dhis2-program") {
         } else if (e && e === "go-data") {
+            if (process.env.NODE_ENV === "development") {
+                mappingApi.updateMany({
+                    authentication: {
+                        url: process.env.REACT_APP_GO_DATA_URL,
+                        username: process.env.REACT_APP_GO_DATA_USERNAME,
+                        password: process.env.REACT_APP_GO_DATA_PASSWORD,
+                        basicAuth: true,
+                    },
+                    prefetch: true,
+                });
+            }
             mappingApi.update({
                 attribute: "authentication",
                 value: true,
@@ -136,7 +148,6 @@ export default function MappingDetails({
             </Stack>
             {!mapping.isCurrentInstance && (
                 <InitialMapping
-                    isSource={mapping.isSource}
                     dataSource={mapping.dataSource}
                     extraction={mapping.useColumnLetters ? "column" : "json"}
                 />

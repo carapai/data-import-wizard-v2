@@ -4,6 +4,8 @@ import {
     Authentication,
     fetchRemote,
     IProgram,
+    mapUnion,
+    Param,
     postRemote,
 } from "data-import-wizard-utils";
 import { fromPairs, groupBy, map, pick } from "lodash";
@@ -345,16 +347,10 @@ export const usePrograms = (
     );
 };
 
-export const makeQueryKeys = (params?: {
-    [key: string]: Partial<{
-        param: string;
-        value: string;
-        forUpdates: boolean;
-    }>;
-}) => {
+export const makeQueryKeys = (params?: Map<string, Partial<Param>>) => {
     if (params) {
         let allParams = new URLSearchParams();
-        Object.values(params).forEach(({ param, value }) => {
+        Array.from(params.values()).forEach(({ param, value }) => {
             if (param && value) {
                 allParams.append(param, value);
             }
@@ -432,26 +428,36 @@ export const useRemoteGet = <T, V>(
                         currentAuth = {
                             ...currentAuth,
                             basicAuth: false,
-                            params: {
-                                ...params,
-                                auth: {
-                                    param: fields.tokenName,
-                                    value: token as string,
-                                },
-                            },
+                            params: mapUnion(
+                                params ?? new Map(),
+                                new Map([
+                                    [
+                                        "auth",
+                                        {
+                                            param: fields.tokenName,
+                                            value: token as string,
+                                        },
+                                    ],
+                                ]),
+                            ),
                             headers,
                         };
                     } else {
                         currentAuth = {
                             ...currentAuth,
                             basicAuth: false,
-                            headers: {
-                                ...headers,
-                                auth: {
-                                    param: fields.tokenName,
-                                    value: token as string,
-                                },
-                            },
+                            headers: mapUnion(
+                                headers ?? new Map(),
+                                new Map([
+                                    [
+                                        "auth",
+                                        {
+                                            param: fields.tokenName,
+                                            value: token as string,
+                                        },
+                                    ],
+                                ]),
+                            ),
                             params,
                         };
                     }
@@ -477,7 +483,6 @@ export const useProgram = (id: string | undefined) => {
             },
         },
     };
-
     return useQuery<Partial<IProgram>, Error>(["programs", id], async () => {
         if (id) {
             const { data }: any = await engine.query(programQuery);
@@ -539,7 +544,6 @@ export const useDataSets = (
                     dataSets,
                 },
             }: any = await engine.query(dataSetsQuery);
-            // setTotalDataSets(totalDataSets);
 
             const des = dataSets.map((dataSet: any) => {
                 const processed = dataSet.dataSetElements.map(
@@ -613,116 +617,10 @@ export const useDataSets = (
                     organisationUnits,
                     forms,
                 };
-                return dataSets;
             });
         },
     );
 };
-
-export const useDataElements = () => {};
-
-export const useUserGroups = () => {};
-
-// export const getDHIS2Resource2 = async <T>({
-//     params,
-//     resource,
-//     engine,
-//     auth,
-//     isCurrentDHIS2,
-// }: Partial<{
-//     params: { [key: string]: string };
-//     resource: string;
-//     engine: any;
-//     isCurrentDHIS2?: boolean;
-//     auth?: Partial<Authentication>;
-// }>) => {
-//     if (isCurrentDHIS2 && resource) {
-//         let query: any = {
-//             data: {
-//                 resource,
-//             },
-//         };
-//         if (!isEmpty(params)) {
-//             query = {
-//                 data: { resource, params },
-//             };
-//         }
-//         const { data }: any = await engine.query(query);
-//         return data as T;
-//     }
-//     if (auth && resource) {
-//         let config: AxiosRequestConfig = {
-//             baseURL: auth.url,
-//         };
-//         if (auth.username && auth.password) {
-//             config = {
-//                 ...config,
-//                 auth: {
-//                     username: auth.username,
-//                     password: auth.password,
-//                 },
-//             };
-//         }
-//         const api = axios.create(config);
-//         const { data } = await api.get<T>(resource, {
-//             params,
-//         });
-//         return data;
-//     }
-//     return {
-//         data: [],
-//         pager: { total: 0, page: 1, pageSize: 50, pageCount: 1 },
-//     };
-// };
-
-// export const useInfiniteDHIS2Query = <
-//     T extends { pager: { page: number; pageCount: number } }
-// >({
-//     search,
-//     resource,
-//     isCurrentDHIS2,
-//     auth,
-// }: {
-//     search: string;
-//     resource: string;
-//     isCurrentDHIS2?: boolean | undefined;
-//     auth?: Partial<Authentication> | undefined;
-// }) => {
-//     const engine = useDataEngine();
-//     return useInfiniteQuery<T, Error>(
-//         [resource, search],
-//         async ({ pageParam = 1 }) => {
-//             let params: { [key: string]: any } = {
-//                 fields: "id,name",
-//                 page: pageParam,
-//                 paging: true,
-//                 totalPages: true,
-//             };
-//             if (search) {
-//                 params = { ...params, filter: `identifiable:token:${search}` };
-//             }
-
-//             const data = await getDHIS2Resource2<T>({
-//                 resource,
-//                 params,
-//                 engine,
-//                 isCurrentDHIS2,
-//                 auth,
-//             });
-//             return data;
-//         },
-//         {
-//             getPreviousPageParam: (firstPage) =>
-//                 firstPage.pager.page ?? undefined,
-//             getNextPageParam: (lastPage) => {
-//                 if (lastPage.pager.page < lastPage.pager.pageCount) {
-//                     return lastPage.pager.page + 1;
-//                 }
-//                 return undefined;
-//             },
-//         }
-//     );
-// };
 
 export const makeSQLQuery = async (
     engine: any,
