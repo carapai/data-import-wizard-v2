@@ -168,9 +168,7 @@ export default function OrganisationUnitMapping({ db }: { db: CQIDexie }) {
                 merger={ouMappingApi.merge}
                 isOrgUnitMapping={true}
             />
-
             <Progress onClose={onClose} isOpen={isOpen} db={db} />
-            <pre>{JSON.stringify(organisationUnitMapping.keys(), null, 2)}</pre>
         </Stack>
     );
 }

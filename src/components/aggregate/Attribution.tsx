@@ -28,15 +28,12 @@ export default function Attribution({ db }: { db: CQIDexie }) {
                 </Checkbox>
                 {attributionMerged ? (
                     <Select
-                        value={metadata.sourceColumns.find(
-                            (pt) =>
-                                pt.value === mapping.attributeOptionComboColumn,
-                        )}
-                        onChange={(e) =>
+                        value={mapping.attributeOptionComboColumn}
+                        onChange={(e) => {
                             mappingApi.updateMany({
-                                attributeOptionComboColumn: e.value,
-                            })
-                        }
+                                attributeOptionComboColumn: e,
+                            });
+                        }}
                         options={metadata.sourceColumns}
                         allowClear
                     />
@@ -47,19 +44,21 @@ export default function Attribution({ db }: { db: CQIDexie }) {
                                 <Stack spacing="2px" w="100%">
                                     <Text>{`${label} Column`}</Text>
                                     <Select
-                                        value={metadata.sourceColumns.find(
-                                            (pt) =>
-                                                pt.value ===
-                                                mapping.categoryColumns?.get(
-                                                    id ?? "",
-                                                ),
-                                        )}
+                                        value={
+                                            metadata.sourceColumns.find(
+                                                (pt) =>
+                                                    pt.value ===
+                                                    mapping.categoryColumns?.get(
+                                                        id ?? "",
+                                                    ),
+                                            )?.value
+                                        }
                                         onChange={(e) =>
                                             mappingApi.updateMany({
                                                 categoryColumns:
                                                     mapping.categoryColumns?.set(
                                                         "id",
-                                                        e.value ?? "",
+                                                        e,
                                                     ),
                                             })
                                         }

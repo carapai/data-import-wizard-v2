@@ -5,6 +5,7 @@ import {
     CategoryCombo,
     CellStyle,
     convertToAggregate,
+    EventStageMapping,
     ExcelHeader,
     ExportColumn,
     Extraction,
@@ -12,6 +13,7 @@ import {
     generateUid,
     IMapping,
     Mapping,
+    mapToObject,
     Option,
     RealMapping,
     StageMapping,
@@ -518,6 +520,13 @@ export const saveMapping = async ({
             data: {
                 ...mapping,
                 lastUpdated: dayjs().format("YYYY-MM-DD HH:mm:ss"),
+                eventStageMapping: mapToObject(
+                    mapping.eventStageMapping ??
+                        new Map<string, Partial<EventStageMapping>>(),
+                ),
+                categoryColumns: mapToObject(
+                    mapping.categoryColumns ?? new Map<string, string>(),
+                ),
             },
         }),
     ];
@@ -527,27 +536,27 @@ export const saveMapping = async ({
             engine.mutate({
                 type,
                 resource: `dataStore/iw-ou-mapping/${mapping.id}`,
-                data: organisationUnitMapping,
+                data: mapToObject(organisationUnitMapping),
             }),
         ]);
     }
 
-    if (!isEmpty(attributionMapping)) {
+    if (attributionMapping) {
         mutations = mutations.concat([
             engine.mutate({
                 type,
                 resource: `dataStore/iw-attribution-mapping/${mapping.id}`,
-                data: attributionMapping,
+                data: mapToObject(attributionMapping),
             }),
         ]);
     }
 
-    if (attributeMapping) {
+    if (attributeMapping && attributeMapping.size > 0) {
         mutations = mutations.concat([
             engine.mutate({
                 type,
                 resource: `dataStore/iw-attribute-mapping/${mapping.id}`,
-                data: attributeMapping,
+                data: mapToObject(attributeMapping),
             }),
         ]);
     }
@@ -558,7 +567,7 @@ export const saveMapping = async ({
                 engine.mutate({
                     type,
                     resource: `dataStore/iw-stage-mapping/${mapping.id}`,
-                    data: programStageMapping,
+                    data: mapToObject(programStageMapping),
                 }),
             ]);
         }
@@ -568,7 +577,7 @@ export const saveMapping = async ({
                 engine.mutate({
                     type,
                     resource: `dataStore/iw-option-mapping/${mapping.id}`,
-                    data: optionMapping,
+                    data: mapToObject(optionMapping),
                 }),
             ]);
         }
@@ -578,7 +587,7 @@ export const saveMapping = async ({
                 engine.mutate({
                     type,
                     resource: `dataStore/iw-enrollment-mapping/${mapping.id}`,
-                    data: enrollmentMapping,
+                    data: mapToObject(enrollmentMapping),
                 }),
             ]);
         }

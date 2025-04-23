@@ -42,7 +42,6 @@ import MappingDetails from "./MappingDetails";
 import OrganisationUnitMapping from "./OrganisationUnitMapping";
 import AttributeMapping from "./program/AttributeMapping";
 import Columns from "./program/Columns";
-import EnrollmentMapping from "./program/EnrollmentMapping";
 import EventMapping from "./program/EventMapping";
 import { OtherSystemMapping } from "./program/OtherSystemMapping";
 import ImportSummary from "./program/ProgramImportSummary";

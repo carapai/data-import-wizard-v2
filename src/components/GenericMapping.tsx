@@ -52,8 +52,6 @@ export default function GenericMapping({
         }
         return [];
     });
-
-    console.log(mappedValues);
     const columns: ColumnsType<Option> = useMemo(
         () => [
             {
@@ -367,14 +365,6 @@ export default function GenericMapping({
                     </Text>
                 )}
             />
-
-            <pre>
-                {JSON.stringify(
-                    findMapped(Array.from(mapped.values())),
-                    null,
-                    2,
-                )}
-            </pre>
         </Stack>
     );
 }

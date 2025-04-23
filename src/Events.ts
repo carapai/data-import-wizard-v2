@@ -95,14 +95,12 @@ export const mappingApi = createApi($mapping, {
             update,
         }: { stage: string; update: Partial<EventStageMapping> },
     ) => {
+        const prev = state.eventStageMapping?.get(stage) ?? {};
+        const clone = new Map(state.eventStageMapping);
+        clone.set(stage, { ...prev, ...update });
         return {
             ...state,
-            eventStageMapping: new Map(
-                new Map(state.eventStageMapping).set(stage, {
-                    ...(new Map(state.eventStageMapping).get(stage) ?? {}),
-                    ...update,
-                }),
-            ),
+            eventStageMapping: clone,
         };
     },
 });
@@ -444,7 +442,7 @@ export const attributionMappingApi = createApi($attributionMapping, {
         return deleteValue(state, value);
     },
     merge: (state, { mapping }: Merger) => mapUnion(new Map(state), mapping),
-    reset: () => new Map(),
+    reset: (state) => state.clear(),
 });
 
 export const metadataApi = createApi($metadata, {

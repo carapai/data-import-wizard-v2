@@ -19,7 +19,8 @@ const onProxyRes = (proxyRes) => {
 
 const options = {
     // target: "https://play.im.dhis2.org/stable-2-39-9",
-    target: "http://localhost:8080",
+    // target: "http://localhost:8080",
+    target: "https://chis.tasouganda.org/prod",
     // target: "https://hmis-tests.health.go.ug",
     // target: "https://play.im.dhis2.org/dev",
     // target: "https://academy.demos.dhis2.org/test1",

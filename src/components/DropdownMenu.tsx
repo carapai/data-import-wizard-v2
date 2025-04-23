@@ -13,7 +13,6 @@ import { useDataEngine } from "@dhis2/app-runtime";
 import { useNavigate } from "@tanstack/react-location";
 import { Modal } from "antd";
 import {
-    generateUid,
     getGoDataToken,
     getPreviousProgramMapping,
     IMapping,
@@ -45,12 +44,22 @@ import {
 } from "../Events";
 import { LocationGenerics } from "../Interfaces";
 
-import { $mapping, actionApi } from "../Store";
+import {
+    $attributeMapping,
+    $attributionMapping,
+    $enrollmentMapping,
+    $mapping,
+    $names,
+    $optionMapping,
+    $organisationUnitMapping,
+    $programStageMapping,
+    actionApi,
+} from "../Store";
+import { isFileBasedMapping, saveMapping } from "../utils/utils";
 import DataImportSummary from "./DataImportSummary";
 import DataPreview from "./DataPreview";
 import ImportExportOptions from "./ImportExportOptions";
 import SwitchComponent, { Case } from "./SwitchComponent";
-import { isFileBasedMapping } from "../utils/utils";
 
 export default function DropdownMenu({
     id,
@@ -74,7 +83,6 @@ export default function DropdownMenu({
     const navigate = useNavigate<LocationGenerics>();
     const [currentMapping, setCurrentMapping] = useState<string>("");
     const [currentName, setCurrentName] = useState<string>(`Copy of ${name}`);
-    const [loading, setLoading] = useState(false);
     const [open, setOpen] = useState(false);
     const [optionsDialogOpen, setOptionsDialogOpen] = useState(false);
     const workingMapping = useStore($mapping);
@@ -82,49 +90,34 @@ export default function DropdownMenu({
         "configuring" | "previewing" | "uploading"
     >("configuring");
 
+    const optionMapping = useStore($optionMapping);
+    const organisationUnitMapping = useStore($organisationUnitMapping);
+    const enrollmentMapping = useStore($enrollmentMapping);
+    const attributionMapping = useStore($attributionMapping);
+    const attributeMapping = useStore($attributeMapping);
+    const programStageMapping = useStore($programStageMapping);
+
+    const names = useStore($names);
+
     const clone = async (id: string) => {
-        const previousMappings = await loadPreviousMapping(
-            { engine },
-            ["iw-mapping"],
-            id,
-        );
-        const mapping: Partial<IMapping> = previousMappings["iw-mapping"] ?? {};
-        if (mapping.type === "individual") {
-            const {
-                programStageMapping,
-                attributeMapping,
+        const mapping = await fetchMapping(id);
+        await saveMapping({
+            engine,
+            mapping: {
+                ...mapping,
+                ...names,
+            },
+            action: "creating",
+            mappings: {
                 organisationUnitMapping,
+                attributeMapping,
+                programStageMapping,
+                enrollmentMapping,
                 optionMapping,
                 attributionMapping,
-            } = await getPreviousProgramMapping(
-                { engine },
-                mapping,
-                async (message: string) => {},
-            );
-            const programMapping = {
-                ...mapping,
-                id: generateUid(),
-                name: currentName,
-            };
-
-            // await saveProgramMapping({
-            //     engine,
-            //     mapping: programMapping,
-            //     action: "creating",
-            //     organisationUnitMapping,
-            //     programStageMapping,
-            //     attributeMapping,
-            //     optionMapping,
-            //     enrollmentMapping,
-            // });
-            setLoading(() => false);
-            setOpen(() => false);
-            afterClone(programMapping);
-            await loadMapping(programMapping.id);
-        } else if (mapping.type === "aggregate") {
-            // const { attributeMapping, organisationUnitMapping, dataSet } =
-            //     await getPreviousAggregateMapping(mapping);
-        }
+            },
+        });
+        afterClone(mapping);
     };
 
     const showModal = (id: string) => {
@@ -133,7 +126,6 @@ export default function DropdownMenu({
     };
 
     const handleOk = async () => {
-        setLoading(() => true);
         await clone(currentMapping);
     };
     const handleOptionsOk = async () => {
